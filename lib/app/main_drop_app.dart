@@ -1,6 +1,4 @@
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/material.dart';
-import 'package:macos_ui/macos_ui.dart';
 import 'package:shakepin/app/about_app.dart';
 import 'package:shakepin/app/crop_app.dart';
 
@@ -29,8 +27,6 @@ class MainDropApp extends StatefulWidget {
 
 class _MainDropAppState extends State<MainDropApp> with DragDropListener {
   var isShakeDetected = false;
-
-  bool _isHoveredTop = false;
 
   bool get _showSidebar => switch (appMode()) {
         AppMode.pin || AppMode.panel => false,
@@ -153,145 +149,71 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
               offstage: isAboutApp() || isSetupApp(),
               // Removed nested SingleChildScrollView wrappers to avoid giving descendants unbounded constraints.
               // Use a bounded SizedBox with MediaQuery sizes and a MouseRegion to preserve hover behavior.
-              child: MouseRegion(
-                onEnter: (_) => setState(() => _isHoveredTop = true),
-                onExit: (_) => setState(() => _isHoveredTop = false),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: MouseRegion(
-                        child: Listener(
-                          onPointerMove: (event) {
-                            dropChannel.startDragging();
-                          },
-                          child: const ColoredBox(
-                            color: Colors.transparent,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Constrain layout to the available window size explicitly.
-                    SizedBox(
-                      width: MediaQuery.sizeOf(context).width,
-                      height: MediaQuery.sizeOf(context).height,
-                      child: Column(
-                        children: [
-                          SizedBox(
-                            height: 9,
-                            child: Center(
-                              child: AnimatedContainer(
-                                duration: Durations.long4,
-                                curve: Curves.fastEaseInToSlowEaseOut,
-                                transform: (Matrix4.identity())
-                                  ..setTranslationRaw(
-                                      _isHoveredTop ? 0 : 0,
-                                      -7,
-                                      0)
-                                  ..scale(_isHoveredTop ? 1.0 : 0.5, 1.0),
-                                child: AnimatedTheme(
-                                  data: Theme.of(context).copyWith(
-                                    iconTheme: IconThemeData(
-                                      color: _isHoveredTop
-                                          ? MacosColors.labelColor
-                                              .resolvedColor(context)
-                                          : MacosColors.labelColor
-                                              .resolvedColor(context)
-                                              .withValues(alpha: 0.1),
-                                    ),
-                                  ),
-                                  duration: Durations.long4,
-                                  curve: Curves.fastEaseInToSlowEaseOut,
-                                  child: const Icon(
-                                    FluentIcons.line_horizontal_1_16_filled,
-                                    size: 24,
-                                  ),
+              child: SizedBox(
+                width: MediaQuery.sizeOf(context).width,
+                height: MediaQuery.sizeOf(context).height,
+                child: ListenableBuilder(
+                  listenable: appMode,
+                  builder: (context, _) {
+                    final dropSection = DropSection(
+                      key: dropSectionKey,
+                    );
+                    final showSidebar = _showSidebar;
+                    final contentWidth = showSidebar
+                        ? MediaQuery.sizeOf(context).width - 48 - 8
+                        : MediaQuery.sizeOf(context).width;
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: switch (appMode()) {
+                            AppMode.pin || AppMode.panel => SizedBox(
+                                width: contentWidth,
+                                height: MediaQuery.sizeOf(context).height,
+                                // Edge-to-edge: padding here looked like a thick gray border
+                                // against the native visual-effect backdrop.
+                                child: dropSection,
+                              ),
+                            AppMode.minify => SizedBox(
+                                width: contentWidth,
+                                height: MediaQuery.sizeOf(context).height,
+                                child: MinifySection(
+                                  dropSection: dropSection,
                                 ),
+                              ),
+                            AppMode.archive => SizedBox(
+                                width: contentWidth,
+                                height: MediaQuery.sizeOf(context).height,
+                                child: ArchiveSection(
+                                  dropSection: dropSection,
+                                ),
+                              ),
+                            _ => SizedBox(
+                                width: contentWidth,
+                                height: MediaQuery.sizeOf(context).height,
+                                child: MiscSection(
+                                  dropSection: dropSection,
+                                ),
+                              ),
+                          },
+                        ),
+                        if (showSidebar)
+                          SizedBox(
+                            height: MediaQuery.sizeOf(context).height - 8,
+                            child: SingleChildScrollView(
+                              physics: const NeverScrollableScrollPhysics(),
+                              child: MainSidebar(
+                                selectedMode: appMode(),
+                                onModeChanged: handleModeChanged,
+                                onShowTooltip: _handleShowTooltip,
+                                onHideTooltip: _handleHideTooltip,
                               ),
                             ),
                           ),
-                          ListenableBuilder(
-                            listenable: appMode,
-                            builder: (context, _) {
-                              final dropSection = DropSection(
-                                key: dropSectionKey,
-                              );
-                              final showSidebar = _showSidebar;
-                              final contentWidth = showSidebar
-                                  ? MediaQuery.sizeOf(context).width - 48 - 8
-                                  : MediaQuery.sizeOf(context).width;
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: switch (appMode()) {
-                                      AppMode.pin || AppMode.panel => SizedBox(
-                                          width: contentWidth,
-                                          height: MediaQuery.sizeOf(context)
-                                                  .height -
-                                              9,
-                                          child: Padding(
-                                            padding: const EdgeInsets.only(
-                                              bottom: 8.0,
-                                              left: 8.0,
-                                              right: 8.0,
-                                            ),
-                                            child: dropSection,
-                                          ),
-                                        ),
-                                      AppMode.minify => SizedBox(
-                                          width: contentWidth,
-                                          height: MediaQuery.sizeOf(context)
-                                                  .height -
-                                              9,
-                                          child: MinifySection(
-                                            dropSection: dropSection,
-                                          ),
-                                        ),
-                                      AppMode.archive => SizedBox(
-                                          width: contentWidth,
-                                          height: MediaQuery.sizeOf(context)
-                                                  .height -
-                                              9,
-                                          child: ArchiveSection(
-                                            dropSection: dropSection,
-                                          ),
-                                        ),
-                                      _ => SizedBox(
-                                          width: contentWidth,
-                                          height: MediaQuery.sizeOf(context)
-                                                  .height -
-                                              9,
-                                          child: MiscSection(
-                                            dropSection: dropSection,
-                                          ),
-                                        ),
-                                    },
-                                  ),
-                                  if (showSidebar)
-                                    SizedBox(
-                                      height:
-                                          MediaQuery.sizeOf(context).height -
-                                              16,
-                                      child: SingleChildScrollView(
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        child: MainSidebar(
-                                          selectedMode: appMode(),
-                                          onModeChanged: handleModeChanged,
-                                          onShowTooltip: _handleShowTooltip,
-                                          onHideTooltip: _handleHideTooltip,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

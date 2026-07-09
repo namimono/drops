@@ -20,7 +20,7 @@ class DroppedItem extends StatefulWidget {
     super.key,
     required this.path,
     required this.onDragStart,
-    required this.onToggleSelection,
+    required this.onSelect,
     required this.onRemove,
     required this.isSelected,
     required this.isHoveredItem,
@@ -31,7 +31,7 @@ class DroppedItem extends StatefulWidget {
 
   final String path;
   final VoidCallback onDragStart;
-  final VoidCallback onToggleSelection;
+  final VoidCallback onSelect;
   final VoidCallback onRemove;
   final bool isSelected;
   final bool isHoveredItem;
@@ -62,6 +62,15 @@ class _DroppedItemState extends State<DroppedItem> {
 
   bool get isDisabled => !appMode().isFileCompatible(widget.path);
 
+  Color _selectionFill(BuildContext context) {
+    if (!widget.isSelected) return Colors.transparent;
+    final isDark = MacosTheme.brightnessOf(context).isDark;
+    // Light gray selection only — no hover background.
+    return isDark
+        ? Colors.white.withValues(alpha: 0.14)
+        : const Color(0xFFE5E5E5);
+  }
+
   @override
   Widget build(BuildContext context) {
     menuProvider(request) => Menu(
@@ -88,18 +97,23 @@ class _DroppedItemState extends State<DroppedItem> {
           ],
         );
 
+    final labelColor = MacosColors.labelColor.resolveFrom(context);
+    final secondaryColor =
+        MacosColors.secondaryLabelColor.resolvedColor(context);
+
     Widget child;
+    final iconSize = widget.displayMode == DisplayMode.list ? 20.0 : 48.0;
     final icon = isUrl(widget.path)
         ? SizedBox(
-            width: 48 + 14,
-            height: 48 + 14,
+            width: iconSize,
+            height: iconSize,
             child: MacosIcon(
               CupertinoIcons.link,
-              color: MacosColors.labelColor.resolveFrom(context),
-              size: widget.displayMode == DisplayMode.list ? 16 : 48,
+              color: labelColor,
+              size: widget.displayMode == DisplayMode.list ? 16 : 40,
             ),
           )
-        : FileImageWidget(path: widget.path);
+        : FileImageWidget(path: widget.path, size: iconSize);
 
     if (widget.displayMode == DisplayMode.list) {
       final file = File(widget.path);
@@ -109,48 +123,36 @@ class _DroppedItemState extends State<DroppedItem> {
           file.existsSync() ? formatFileSize(file.lengthSync()) : '';
 
       child = GestureDetector(
-        onTapDown: (_) {},
-        onTap: widget.onToggleSelection,
-        child: AnimatedContainer(
-          duration: Durations.short2,
+        onTap: widget.onSelect,
+        child: Container(
           decoration: BoxDecoration(
-            color: widget.isSelected
-                ? MacosColors.controlAccentColor
-                : Colors.transparent,
+            color: _selectionFill(context),
+            borderRadius: BorderRadius.circular(8),
           ),
-          foregroundDecoration: BoxDecoration(
-            color: widget.isHoveredItem
-                ? MacosColors.systemGrayColor
-                    .resolvedColor(context)
-                    .withOpacity(.2)
-                : Colors.transparent,
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
           child: Row(
             children: [
               SizedBox.square(
-                dimension: 16,
+                dimension: 20,
                 child: icon,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   fileName,
                   style: TextStyle(
                     fontSize: 12,
-                    color: widget.isSelected ? MacosColors.white : null,
+                    color: labelColor,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 fileSize,
                 style: TextStyle(
-                  fontSize: 12,
-                  color: (widget.isSelected
-                          ? MacosColors.white
-                          : MacosColors.labelColor.resolvedColor(context))
-                      .withOpacity(.5),
+                  fontSize: 11,
+                  color: secondaryColor,
                 ),
               ),
             ],
@@ -158,48 +160,37 @@ class _DroppedItemState extends State<DroppedItem> {
         ),
       );
     } else {
-      child = AnimatedContainer(
-        height: 72,
-        duration: Durations.short4,
-        curve: Curves.fastEaseInToSlowEaseOut,
-        // foregroundDecoration: BoxDecoration(
-        //   borderRadius: BorderRadius.circular(4),
-        //   border: isSelected
-        //       ? Border.all(color: MacosColors.controlAccentColor, width: 2)
-        //       : null,
-        // ),
-        child: MacosIconButton(
-          onPressed: () {
-            widget.onToggleSelection();
-          },
-          backgroundColor: widget.isSelected
-              ? MacosColors.controlAccentColor
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
-          hoverColor: widget.isSelected
-              ? Color.lerp(MacosColors.controlAccentColor,
-                  MacosColors.labelColor.resolvedColor(context), .2)
-              : MacosColors.controlColor.resolveFrom(context),
-          icon: Stack(
+      final fileName = isUrl(widget.path)
+          ? widget.path
+          : path.basename(widget.path);
+
+      child = GestureDetector(
+        onTap: widget.onSelect,
+        child: Container(
+          height: 88,
+          decoration: BoxDecoration(
+            color: _selectionFill(context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Stack(
             children: [
               Opacity(
                 opacity: isDisabled ? 0.2 : 1,
                 child: Column(
                   children: [
-                    icon,
+                    Expanded(
+                      child: Center(child: icon),
+                    ),
                     SizedBox(
-                      height: 14,
-                      width: 80,
+                      height: 16,
+                      width: double.infinity,
                       child: ExtendedText(
-                        isUrl(widget.path)
-                            ? widget.path
-                            : widget.path.split('/').last,
+                        fileName,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 12,
-                          color: widget.isSelected
-                              ? MacosColors.white
-                              : MacosColors.labelColor.resolveFrom(context),
+                          fontSize: 11,
+                          color: labelColor,
                         ),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
@@ -209,15 +200,13 @@ class _DroppedItemState extends State<DroppedItem> {
                           child: Text(
                             '…',
                             style: TextStyle(
-                              fontSize: 12,
-                              color: widget.isSelected
-                                  ? MacosColors.white
-                                  : MacosColors.labelColor,
+                              fontSize: 11,
+                              color: labelColor,
                             ),
                           ),
                         ),
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -240,13 +229,7 @@ class _DroppedItemState extends State<DroppedItem> {
       child: ContextMenuWidget(
         menuProvider: menuProvider,
         child: MouseRegion(
-          onEnter: (event) {
-            // dropChannel.showPopover(
-            //   path,
-            //   edge: PopoverEdge.bottom,
-            // );
-            widget.onEnter();
-          },
+          onEnter: (_) => widget.onEnter(),
           onExit: (_) {
             widget.onExit();
             WidgetsBinding.instance.addPostFrameCallback((_) {

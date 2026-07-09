@@ -374,7 +374,8 @@ class MainFlutterWindow: NSWindow {
     effectView.state = .active
     effectView.frame = flutterViewController.view.bounds
     effectView.wantsLayer = true
-    effectView.layer?.cornerRadius = 16
+    // Match contentView corner radius so no gray ring shows at the edges.
+    effectView.layer?.cornerRadius = 32
     effectView.layer?.masksToBounds = true
 
     self.contentView?.addSubview(

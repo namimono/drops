@@ -6,9 +6,14 @@ import 'package:shakepin/utils/drop_channel.dart';
 import 'package:shakepin/utils/logger.dart';
 
 class FileImageWidget extends StatefulWidget {
-  const FileImageWidget({super.key, required this.path});
+  const FileImageWidget({
+    super.key,
+    required this.path,
+    this.size = 62,
+  });
 
   final String path;
+  final double size;
 
   @override
   State<FileImageWidget> createState() => _FileImageWidgetState();
@@ -39,17 +44,17 @@ class _FileImageWidgetState extends State<FileImageWidget> {
   @override
   Widget build(BuildContext context) {
     if (_iconData == null) {
-      return const SizedBox(
-        width: 48 + 14,
-        height: 48 + 14,
-        child: Center(child: ProgressCircle()),
+      return SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: const Center(child: ProgressCircle()),
       );
     }
 
     return Image.memory(
       _iconData!,
-      width: 48 + 14,
-      height: 48 + 14,
+      width: widget.size,
+      height: widget.size,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
         if (wasSynchronouslyLoaded || frame != null) {
           return child;

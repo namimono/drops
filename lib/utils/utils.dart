@@ -16,8 +16,11 @@ sealed class AppSizes {
   static const misc = Size(240 + 48 + 12 + 16, 468);
   static const crop = Size(980,680);
 
-  /// Dropover-style shelf: content box only (no sidebar).
-  static const pin = Size(256, 240);
+  /// Dropover-style shelf: collapsed stack (default).
+  static const pin = Size(200, 200);
+
+  /// Dropover-style shelf: expanded grid/list browser.
+  static const pinExpanded = Size(256, 280);
 }
 
 final haptic = MacosHapticFeedback();
