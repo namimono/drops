@@ -82,6 +82,12 @@ class DropTarget: NSView {
             } else if let urlString = item.string(forType: .URL), let url = URL(string: urlString) {
                 paths.append(url.absoluteString)
                 NSLog("Added URL path: \(url.absoluteString)")
+            } else if let string = item.string(forType: .string) {
+                // Prefer plain text over HTML/RTF — many apps put both on the
+                // pasteboard (e.g. browsers, Codex), and users usually want txt.
+                let path = saveStringToTemp(string: string, directory: dropDirectory, fileName: "文字档.txt")
+                if !path.isEmpty { paths.append(path) }
+                NSLog("Saved string: \(path)")
             } else if let rtfData = item.data(forType: .rtf) {
                 let path = saveDataToTemp(data: rtfData, directory: dropDirectory, fileName: "富文本.rtf")
                 if !path.isEmpty { paths.append(path) }
@@ -107,10 +113,6 @@ class DropTarget: NSView {
                 let path = saveDataToTemp(data: soundData, directory: dropDirectory, fileName: "声音.aiff")
                 if !path.isEmpty { paths.append(path) }
                 NSLog("Saved sound data: \(path)")
-            } else if let string = item.string(forType: .string) {
-                let path = saveStringToTemp(string: string, directory: dropDirectory, fileName: "文字档.txt")
-                if !path.isEmpty { paths.append(path) }
-                NSLog("Saved string: \(path)")
             } else if let fileContents = item.data(forType: .fileContents) {
                 let path = saveDataToTemp(
                     data: fileContents, directory: dropDirectory, fileName: "文件.dat")
