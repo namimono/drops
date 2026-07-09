@@ -35,7 +35,17 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
   @override
   void initState() {
     dropChannel.addListener(this);
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     super.initState();
+  }
+
+  /// Esc collapses details → stack. Stacked shelf only closes via the X button.
+  bool _handleHardwareKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    if (event.logicalKey != LogicalKeyboardKey.escape) return false;
+    if (!_isExpanded) return true; // swallow Esc so it never dismisses the shelf
+    _setExpanded(false);
+    return true;
   }
 
   void _addPaths(List<String> paths) {
@@ -551,6 +561,7 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     dropChannel.removeListener(this);
     super.dispose();
   }
