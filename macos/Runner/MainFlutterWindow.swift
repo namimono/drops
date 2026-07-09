@@ -192,6 +192,36 @@ class MainFlutterWindow: NSWindow {
     return true
   }
 
+  /// Handles Edit → Paste and Cmd+V when this window is in the responder chain.
+  @objc func paste(_ sender: Any?) {
+    let paths = DropTarget.materializePaths(from: .general)
+    guard !paths.isEmpty else { return }
+    channel.invokeMethod("pastePerform", arguments: paths)
+  }
+
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    if flags.contains(.command),
+      !flags.contains(.shift),
+      !flags.contains(.option),
+      !flags.contains(.control),
+      event.charactersIgnoringModifiers?.lowercased() == "v"
+    {
+      // Don't steal paste from native text fields (e.g. settings).
+      if let firstResponder = firstResponder,
+        firstResponder is NSTextView || firstResponder is NSTextField
+      {
+        return super.performKeyEquivalent(with: event)
+      }
+      let paths = DropTarget.materializePaths(from: .general)
+      if !paths.isEmpty {
+        channel.invokeMethod("pastePerform", arguments: paths)
+        return true
+      }
+    }
+    return super.performKeyEquivalent(with: event)
+  }
+
   func setupNativeDropdownChannel() {
     dropdownChannel = FlutterMethodChannel(
       name: "com.damywise.flutter_macos_native_dropdown/channel",
@@ -465,6 +495,11 @@ class MainFlutterWindow: NSWindow {
 
       self.setIsVisible(visible)
       self.animator().alphaValue = visible ? 1.0 : 0.0
+      if visible {
+        // Become key so Cmd+V / menu Paste reach this floating shelf window.
+        self.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+      }
       result(nil)
 
     case "orderFront":
@@ -636,6 +671,12 @@ class MainFlutterWindow: NSWindow {
             message: "Text must be a string",
             details: nil))
       }
+
+    case "readFromPasteboard":
+      // Materialize clipboard items the same way drag-drop does (files stay
+      // as paths; text/images/etc. become temp files under the app tmp dir).
+      let paths = DropTarget.materializePaths(from: .general)
+      result(paths)
 
     case "setupMenuBar":
       if let menuItems = call.arguments as? [[String: Any]] {
@@ -1027,7 +1068,6 @@ class MainFlutterWindow: NSWindow {
         ("Show", 1),
         ("Hide", 2),
         ("About Shakepin", 3),
-        ("Manage License", 5),
         ("Quit", -1),
       ]
 
@@ -1035,17 +1075,6 @@ class MainFlutterWindow: NSWindow {
         let item = NSMenuItem(title: title, action: #selector(menuItemClicked), keyEquivalent: "")
         item.target = self
         item.tag = tag
-
-        // Highlight the "Mange License" item with background color
-        if tag == 5 {
-          item.attributedTitle = NSAttributedString(
-            string: title,
-            attributes: [
-              .font: NSFont.boldSystemFont(ofSize: NSFont.systemFontSize),
-              .foregroundColor: NSColor.systemBlue,
-            ]
-          )
-        }
 
         menu.addItem(item)
       }

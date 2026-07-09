@@ -16,7 +16,8 @@ sealed class AppSizes {
   static const misc = Size(240 + 48 + 12 + 16, 468);
   static const crop = Size(980,680);
 
-  static const pin = Size(240 + 48 + 12 + 16, 240);
+  /// Dropover-style shelf: content box only (no sidebar).
+  static const pin = Size(256, 240);
 }
 
 final haptic = MacosHapticFeedback();
@@ -160,8 +161,7 @@ extension IterableExtension<T> on Iterable<String> {
 
 void resetFrameAndHide() async {
   await Future.delayed(Durations.short1);
-  final width =
-      appMode() == AppMode.panel ? AppSizes.panel.width : AppSizes.pin.width;
+  final width = AppSizes.pin.width;
   final height = Platform.isMacOS ? 48.0 : 65.0;
   if (Platform.isWindows) {
     await dropChannel.setMinimumSize(
@@ -198,7 +198,7 @@ Future<void> showApp() async {
     appSize = AppSizes.crop;
   } else {
     appSize = switch (appMode()) {
-      AppMode.panel => AppSizes.panel,
+      AppMode.panel => AppSizes.pin,
       AppMode.minify => AppSizes.minify,
       AppMode.pin => AppSizes.pin,
       AppMode.archive => AppSizes.archive,

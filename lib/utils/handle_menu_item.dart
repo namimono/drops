@@ -16,10 +16,6 @@ void handleMenuItemClicked(int tag) async {
       showApp();
     case 4: // reset shared preferences
       await prefs.clear();
-    case 5: // input license key
-      isLicenseApp.value = true;
-      isAboutApp.value = false;
-      showApp();
     default:
       break;
   }

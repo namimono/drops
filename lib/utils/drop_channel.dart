@@ -83,6 +83,14 @@ class DropChannel {
               .firstWhere((element) => element.label == args[0])
               .onDragPerform(List<String>.from(args[1]));
 
+        case 'pastePerform':
+          // Native Cmd+V / Edit → Paste: same shelf update as a drop.
+          final paths = List<String>.from(call.arguments as List);
+          if (paths.isNotEmpty) {
+            items.value = items().union(paths.toSet());
+            selectedItems.value = selectedItems().union(paths.toSet());
+          }
+
         case 'dragUpdated':
           final args = call.arguments;
           listeners
@@ -515,6 +523,24 @@ class DropChannel {
       return await _channel.invokeMethod('isProcessRunning');
     } catch (e) {
       return false;
+    }
+  }
+
+  /// Reads the system clipboard and materializes items as file paths
+  /// (same rules as drag-drop). Returns an empty list if nothing usable.
+  Future<List<String>> readFromPasteboard() async {
+    if (Platform.isWindows) {
+      return const [];
+    }
+    try {
+      final result = await _channel.invokeMethod('readFromPasteboard');
+      return List<String>.from(result as List? ?? const []);
+    } on PlatformException catch (e) {
+      logger.log('Error reading pasteboard: ${e.message}');
+      return const [];
+    } catch (e) {
+      logger.log('Unexpected error reading pasteboard: $e');
+      return const [];
     }
   }
 

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:macos_ui/macos_ui.dart';
 import 'package:shakepin/app/about_app.dart';
 import 'package:shakepin/app/crop_app.dart';
-import 'package:shakepin/app/license_app.dart';
 
 import 'package:shakepin/app/sections/archive_section/archive_section.dart';
 import 'package:shakepin/app/main_drop/drop_section.dart';
@@ -14,7 +13,6 @@ import 'package:shakepin/app/setup_app.dart';
 import 'package:shakepin/utils/drop_channel.dart';
 import 'package:shakepin/utils/logger.dart';
 import 'package:shakepin/utils/utils.dart';
-import 'package:shakepin/widgets/support_banner.dart';
 
 import '../state.dart';
 
@@ -33,6 +31,11 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
   var isShakeDetected = false;
 
   bool _isHoveredTop = false;
+
+  bool get _showSidebar => switch (appMode()) {
+        AppMode.pin || AppMode.panel => false,
+        _ => true,
+      };
 
   @override
   void initState() {
@@ -54,11 +57,18 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
 
   void itemListener() {
     logger.log('Items changed: ${items().length} items');
-    if (items().isEmpty) {
-      logger.log('Items empty, resetting frame and hiding');
-      handleDefaultMode();
-      resetFrameAndHide();
+    if (items().isNotEmpty) {
+      keepEmptyShelfVisible = false;
+      return;
     }
+    // Empty after user cleared items: hide. Keep visible if shelf was just invoked.
+    if (keepEmptyShelfVisible) {
+      logger.log('Items empty but shelf invoked empty — keeping visible');
+      return;
+    }
+    logger.log('Items empty, resetting frame and hiding');
+    handleDefaultMode();
+    resetFrameAndHide();
   }
 
   @override
@@ -67,13 +77,12 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
     if (!isShakeDetected) {
       logger.log('Processing first shake detection');
       isShakeDetected = true;
-      final appSize = switch (appMode()) {
-        AppMode.panel => AppSizes.panel,
-        AppMode.pin => AppSizes.pin,
-        AppMode.minify => AppSizes.minify,
-        AppMode.archive => AppSizes.archive,
-        _ => AppSizes.misc,
-      };
+      keepEmptyShelfVisible = items().isEmpty;
+      // Dropover-style: always show the pin content box on invoke.
+      if (appMode() != AppMode.pin) {
+        handleModeChanged(AppMode.pin, force: true);
+      }
+      const appSize = AppSizes.pin;
 
       logger.log('Setting frame with size: ${appSize.width}x${appSize.height}');
       await dropChannel.setFrame(
@@ -96,7 +105,7 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
 
     Future.delayed(const Duration(milliseconds: 100), () {
       logger.log('Post-frame callback: checking items');
-      if (items().isEmpty) {
+      if (items().isEmpty && !keepEmptyShelfVisible) {
         logger.log('No items, resetting frame');
         resetFrameAndHide();
       }
@@ -134,8 +143,6 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
     return ListenableBuilder(
       listenable: Listenable.merge([
         isAboutApp,
-        isLicenseApp,
-        isLicenseValid,
         isSetupApp,
         isCropApp,
       ]),
@@ -143,7 +150,7 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
         return Stack(
           children: [
             Offstage(
-              offstage: isAboutApp() || isLicenseApp() || isSetupApp(),
+              offstage: isAboutApp() || isSetupApp(),
               // Removed nested SingleChildScrollView wrappers to avoid giving descendants unbounded constraints.
               // Use a bounded SizedBox with MediaQuery sizes and a MouseRegion to preserve hover behavior.
               child: MouseRegion(
@@ -177,14 +184,8 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
                                 curve: Curves.fastEaseInToSlowEaseOut,
                                 transform: (Matrix4.identity())
                                   ..setTranslationRaw(
-                                      appMode() == AppMode.panel
-                                          ? _isHoveredTop
-                                              ? 1
-                                              : 6
-                                          : _isHoveredTop
-                                              ? -29
-                                              : -24,
-                                      appMode() == AppMode.panel ? -6 : -7,
+                                      _isHoveredTop ? 0 : 0,
+                                      -7,
                                       0)
                                   ..scale(_isHoveredTop ? 1.0 : 0.5, 1.0),
                                 child: AnimatedTheme(
@@ -214,102 +215,75 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
                               final dropSection = DropSection(
                                 key: dropSectionKey,
                               );
+                              final showSidebar = _showSidebar;
+                              final contentWidth = showSidebar
+                                  ? MediaQuery.sizeOf(context).width - 48 - 8
+                                  : MediaQuery.sizeOf(context).width;
                               return Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment:
-                                    appMode() == AppMode.panel
-                                        ? MainAxisAlignment.center
-                                        : MainAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.start,
                                 children: [
-                                  AnimatedOpacity(
-                                    duration: Durations.long1,
-                                    curve: Curves.easeOutCubic,
-                                    opacity:
-                                        appMode() == AppMode.panel ? 0 : 1,
-                                    child: Offstage(
-                                      offstage: appMode() == AppMode.panel,
-                                      child: switch (appMode()) {
-                                        AppMode.pin ||
-                                        AppMode.panel =>
-                                          SizedBox(
-                                            width: MediaQuery.sizeOf(context)
-                                                    .width -
-                                                48 -
-                                                8,
-                                            height: MediaQuery.sizeOf(context)
-                                                    .height -
-                                                9,
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.only(
-                                                bottom: 8.0,
-                                                left: 8.0,
-                                                right: 8.0,
-                                              ),
-                                              child: dropSection,
+                                  Expanded(
+                                    child: switch (appMode()) {
+                                      AppMode.pin || AppMode.panel => SizedBox(
+                                          width: contentWidth,
+                                          height: MediaQuery.sizeOf(context)
+                                                  .height -
+                                              9,
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                              bottom: 8.0,
+                                              left: 8.0,
+                                              right: 8.0,
                                             ),
+                                            child: dropSection,
                                           ),
-                                        AppMode.minify => SizedBox(
-                                            width:
-                                                MediaQuery.sizeOf(context)
-                                                        .width -
-                                                    48 -
-                                                    8,
-                                            height:
-                                                MediaQuery.sizeOf(context)
-                                                        .height -
-                                                    9,
-                                            child: MinifySection(
-                                              dropSection: dropSection,
-                                            ),
+                                        ),
+                                      AppMode.minify => SizedBox(
+                                          width: contentWidth,
+                                          height: MediaQuery.sizeOf(context)
+                                                  .height -
+                                              9,
+                                          child: MinifySection(
+                                            dropSection: dropSection,
                                           ),
-                                        AppMode.archive => SizedBox(
-                                            width:
-                                                MediaQuery.sizeOf(context)
-                                                        .width -
-                                                    48 -
-                                                    8,
-                                            height:
-                                                MediaQuery.sizeOf(context)
-                                                        .height -
-                                                    9,
-                                            child: ArchiveSection(
-                                              dropSection: dropSection,
-                                            ),
+                                        ),
+                                      AppMode.archive => SizedBox(
+                                          width: contentWidth,
+                                          height: MediaQuery.sizeOf(context)
+                                                  .height -
+                                              9,
+                                          child: ArchiveSection(
+                                            dropSection: dropSection,
                                           ),
-                                        _ => SizedBox(
-                                            width:
-                                                MediaQuery.sizeOf(context)
-                                                        .width -
-                                                    48 -
-                                                    8,
-                                            height:
-                                                MediaQuery.sizeOf(context)
-                                                        .height -
-                                                    9,
-                                            child: MiscSection(
-                                              dropSection: dropSection,
-                                            ),
+                                        ),
+                                      _ => SizedBox(
+                                          width: contentWidth,
+                                          height: MediaQuery.sizeOf(context)
+                                                  .height -
+                                              9,
+                                          child: MiscSection(
+                                            dropSection: dropSection,
                                           ),
-                                      },
-                                    ),
+                                        ),
+                                    },
                                   ),
-                                  SizedBox(
-                                    height:
-                                        MediaQuery.sizeOf(context).height -
-                                            16,
-                                    child: SingleChildScrollView(
-                                      // Keep a single scrollable for the sidebar only, so it has bounded height.
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      child: MainSidebar(
-                                        selectedMode: appMode(),
-                                        onModeChanged: handleModeChanged,
-                                        onShowTooltip: _handleShowTooltip,
-                                        onHideTooltip: _handleHideTooltip,
+                                  if (showSidebar)
+                                    SizedBox(
+                                      height:
+                                          MediaQuery.sizeOf(context).height -
+                                              16,
+                                      child: SingleChildScrollView(
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        child: MainSidebar(
+                                          selectedMode: appMode(),
+                                          onModeChanged: handleModeChanged,
+                                          onShowTooltip: _handleShowTooltip,
+                                          onHideTooltip: _handleHideTooltip,
+                                        ),
                                       ),
                                     ),
-                                  )
                                 ],
                               );
                             },
@@ -326,10 +300,6 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
               child: const AboutApp(),
             ),
             Offstage(
-              offstage: !isLicenseApp(),
-              child: const LicenseApp(),
-            ),
-            Offstage(
               offstage: !isSetupApp(),
               child: const SetupApp(),
             ),
@@ -337,8 +307,6 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
               offstage: !isCropApp(),
               child: const CropApp(),
             ),
-
-            if (!isLicenseValid()) const SupportBanner(),
           ],
         );
       },

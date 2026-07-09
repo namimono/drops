@@ -13,7 +13,6 @@ import 'package:shakepin/app/main_drop_app.dart';
 import 'package:shakepin/state.dart';
 import 'package:shakepin/utils/cli.dart';
 import 'package:shakepin/utils/drop_channel.dart';
-import 'package:shakepin/utils/license_service.dart';
 import 'package:shakepin/utils/utils.dart';
 import 'package:shakepin/services/settings_service.dart';
 import 'package:shakepin/services/cli_tool_availability_service.dart';
@@ -25,11 +24,10 @@ import 'package:window_manager/window_manager.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await RustLib.init();
-  LicenseService.instance;
   await DropdownChannel.instance.initialize();
 
   prefs = await SharedPreferences.getInstance();
-  await initCli();
+  await cli.init();
   
   // Initialize CLI tool availability service
   await cliToolAvailability.initialize();
@@ -53,8 +51,8 @@ void main() async {
 
     dropChannel.setMinimumSize(
       Size(
-        AppSizes.panel.width,
-        AppSizes.panel.height,
+        AppSizes.pin.width,
+        AppSizes.pin.height,
       ),
     );
     Window.hideWindowControls();
@@ -78,8 +76,8 @@ void main() async {
   dropChannel.setFrame(
     Rect.fromCenter(
       center: await dropChannel.center(),
-      width: AppSizes.panel.width,
-      height: AppSizes.panel.height,
+      width: AppSizes.pin.width,
+      height: AppSizes.pin.height,
     ),
     animate: false,
   );

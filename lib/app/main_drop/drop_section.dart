@@ -33,6 +33,12 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
     super.initState();
   }
 
+  void _addPaths(List<String> paths) {
+    if (paths.isEmpty) return;
+    items.value = items().union(paths.toSet());
+    selectedItems.value = selectedItems().union(paths.toSet());
+  }
+
   void _shareSelectedFiles() async {
     final filesToShare = selectedItems().isNotEmpty ? selectedItems() : items();
     final xFiles = filesToShare.map((path) => XFile(path)).toList();
@@ -91,20 +97,15 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
         });
       },
       onDragPerform: (paths) async {
-        items.value = items().union(paths.toSet());
-        selectedItems.value = selectedItems().union(paths.toSet());
+        _addPaths(paths);
       },
       child: SizedBox(
-        // width: AppSizes.main.height - 8,
-        width: MediaQuery.sizeOf(context).width - 64,
-        // width: max(
-        //   AppSizes.main.width,
-        //   MediaQuery.sizeOf(context).width - 16,
-        // ),
+        width: switch (appMode()) {
+          AppMode.pin || AppMode.panel =>
+            MediaQuery.sizeOf(context).width - 16,
+          _ => MediaQuery.sizeOf(context).width - 64,
+        },
         height: switch (appMode()) {
-          // AppMode.minify when containsVideoOnly => 300,
-          // AppMode.minify when containsImageOnly => 300,
-          // AppMode.minify when containsBoth => 218,
           AppMode.minify => null,
           _ => MediaQuery.sizeOf(context).height - 16,
         },
@@ -205,6 +206,7 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
                                                         const Radius.circular(
                                                             24)),
                                             onTap: () {
+                                              keepEmptyShelfVisible = false;
                                               setState(() {
                                                 selectedItems().clear();
                                               });
@@ -222,123 +224,198 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
                                             ),
                                           ),
                                         ),
-                                        SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: GlassButton(
-                                            secondary: true,
-                                            padding: EdgeInsets.zero,
-                                            radius: 4,
-                                            onTap: () {
-                                              resetFrameAndHide();
-                                            },
-                                            child: MacosIcon(
-                                              FluentIcons
-                                                  .arrow_minimize_16_regular,
-                                              color: MacosColors.labelColor
-                                                  .resolvedColor(context),
-                                              size: 12,
+                                        if (items().isNotEmpty) ...[
+                                          SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: GlassButton(
+                                              secondary: true,
+                                              padding: EdgeInsets.zero,
+                                              radius: 4,
+                                              onTap: () {
+                                                keepEmptyShelfVisible = false;
+                                                resetFrameAndHide();
+                                              },
+                                              child: MacosIcon(
+                                                FluentIcons
+                                                    .arrow_minimize_16_regular,
+                                                color: MacosColors.labelColor
+                                                    .resolvedColor(context),
+                                                size: 12,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: GlassButton(
-                            secondary: true,
-                            padding: EdgeInsets.zero,
-                            radius: 4,
-                            onTap: () {
-                              SettingsService.openSettings();
-                            },
-                            child: MacosIcon(
-                              FluentIcons.settings_16_regular,
-                              color: MacosColors.labelColor
-                                  .resolvedColor(context),
-                              size: 12,
-                            ),
-                          ),
-                        ),
+                                          SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: GlassButton(
+                                              secondary: true,
+                                              padding: EdgeInsets.zero,
+                                              radius: 4,
+                                              onTap: () {
+                                                SettingsService.openSettings();
+                                              },
+                                              child: MacosIcon(
+                                                FluentIcons.settings_16_regular,
+                                                color: MacosColors.labelColor
+                                                    .resolvedColor(context),
+                                                size: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
-                                  IntrinsicWidth(
-                                    child: Row(
-                                      children: [
-                                        const Spacer(),
-                                        IgnorePointer(
-                                          child: IntrinsicWidth(
-                                            child: Text(
-                                              '${items().length} Files ',
-                                              style:
-                                                  const TextStyle(fontSize: 12),
+                                  if (items().isNotEmpty) ...[
+                                    IntrinsicWidth(
+                                      child: Row(
+                                        children: [
+                                          const Spacer(),
+                                          IgnorePointer(
+                                            child: IntrinsicWidth(
+                                              child: Text(
+                                                '${items().length} Files ',
+                                                style: const TextStyle(
+                                                    fontSize: 12),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        Transform.translate(
-                                          offset: const Offset(0, 1),
-                                          child: SizedBox(
-                                            width: 16,
+                                          Transform.translate(
+                                            offset: const Offset(0, 1),
+                                            child: SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: NativeDropdownButton(
+                                                disableTrailing: true,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 2),
+                                                pullsDown: true,
+                                                onChanged: (value) {
+                                                  switch (value) {
+                                                    case null:
+                                                      throw UnimplementedError();
+                                                    case DropAction._:
+                                                      throw UnimplementedError();
+                                                    case DropAction
+                                                          .removeSelected:
+                                                      items.value = items()
+                                                          .difference(
+                                                              selectedItems());
+                                                      selectedItems.clear();
+                                                    case DropAction.copyLink:
+                                                      // TODO: Handle this case.
+                                                      throw UnimplementedError();
+                                                    case DropAction.unselectAl:
+                                                      selectedItems.clear();
+                                                    case DropAction.selectAll:
+                                                      selectedItems.value =
+                                                          Set.from(items());
+                                                  }
+                                                },
+                                                items: DropAction.values
+                                                    .map((action) =>
+                                                        NativeDropdownItem(
+                                                          value: action,
+                                                          label: action.label,
+                                                          enabled: switch (
+                                                              action) {
+                                                            DropAction._ =>
+                                                              false,
+                                                            DropAction
+                                                                  .removeSelected =>
+                                                              items()
+                                                                  .isNotEmpty,
+                                                            DropAction
+                                                                  .copyLink =>
+                                                              items()
+                                                                  .isNotEmpty,
+                                                            DropAction
+                                                                  .unselectAl =>
+                                                              selectedItems()
+                                                                  .isNotEmpty,
+                                                            DropAction
+                                                                  .selectAll =>
+                                                              items()
+                                                                  .difference(
+                                                                      selectedItems())
+                                                                  .isNotEmpty,
+                                                          },
+                                                        ))
+                                                    .toList(),
+                                                child: Transform.translate(
+                                                  offset: const Offset(0, 0),
+                                                  child: MacosIcon(
+                                                    FluentIcons
+                                                        .chevron_down_16_regular,
+                                                    color: MacosColors
+                                                        .labelColor
+                                                        .resolvedColor(
+                                                            context),
+                                                    size: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Row(
+                                        spacing: 4,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.end,
+                                        children: [
+                                          MacosCheckbox(
+                                            value: checkboxValue,
+                                            onChanged: onCheckboxChanged,
+                                          ),
+                                          SizedBox.square(
+                                            dimension: 16,
+                                            child: GlassButton(
+                                              secondary: true,
+                                              padding: EdgeInsets.zero,
+                                              radius: 4,
+                                              onTap: _shareSelectedFiles,
+                                              child: MacosIcon(
+                                                FluentIcons.share_16_regular,
+                                                color: MacosColors.labelColor
+                                                    .resolvedColor(context),
+                                                size: 12,
+                                              ),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: 22,
                                             height: 16,
-                                            child: NativeDropdownButton(
-                                              disableTrailing: true,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 2),
-                                              pullsDown: true,
-                                              onChanged: (value) {
-                                                switch (value) {
-                                                  case null:
-                                                    throw UnimplementedError();
-                                                  case DropAction._:
-                                                    throw UnimplementedError();
-                                                  case DropAction
-                                                        .removeSelected:
-                                                    items.value = items()
-                                                        .difference(
-                                                            selectedItems());
-                                                    selectedItems.clear();
-                                                  case DropAction.copyLink:
-                                                    // TODO: Handle this case.
-                                                    throw UnimplementedError();
-                                                  case DropAction.unselectAl:
-                                                    selectedItems.clear();
-                                                  case DropAction.selectAll:
-                                                    selectedItems.value =
-                                                        Set.from(items());
-                                                }
+                                            child: GlassButton(
+                                              secondary: true,
+                                              onTap: () {
+                                                setState(() {
+                                                  _displayMode =
+                                                      _displayMode ==
+                                                              DisplayMode.grid
+                                                          ? DisplayMode.list
+                                                          : DisplayMode.grid;
+                                                });
                                               },
-                                              items: DropAction.values
-                                                  .map((action) =>
-                                                      NativeDropdownItem(
-                                                        value: action,
-                                                        label: action.label,
-                                                        enabled: switch (
-                                                            action) {
-                                                          DropAction._ => false,
-                                                          DropAction
-                                                                .removeSelected =>
-                                                            items().isNotEmpty,
-                                                          DropAction.copyLink =>
-                                                            items().isNotEmpty,
-                                                          DropAction
-                                                                .unselectAl =>
-                                                            selectedItems()
-                                                                .isNotEmpty,
-                                                          DropAction
-                                                                .selectAll =>
-                                                            items()
-                                                                .difference(
-                                                                    selectedItems())
-                                                                .isNotEmpty,
-                                                        },
-                                                      ))
-                                                  .toList(),
+                                              padding: EdgeInsets.zero,
+                                              borderRadius: const BorderRadius
+                                                      .all(Radius.circular(8))
+                                                  .copyWith(
+                                                      topRight: const Radius
+                                                          .circular(24)),
                                               child: Transform.translate(
-                                                offset: const Offset(0, 0),
+                                                offset: const Offset(-1, .5),
                                                 child: MacosIcon(
-                                                  FluentIcons
-                                                      .chevron_down_16_regular,
+                                                  _displayMode ==
+                                                          DisplayMode.grid
+                                                      ? FluentIcons
+                                                          .text_bullet_list_ltr_16_regular
+                                                      : FluentIcons
+                                                          .grid_16_regular,
                                                   color: MacosColors.labelColor
                                                       .resolvedColor(context),
                                                   size: 12,
@@ -346,72 +423,10 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
                                               ),
                                             ),
                                           ),
-                                        )
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  Expanded(
-                                    child: Row(
-                                      spacing: 4,
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        MacosCheckbox(
-                                          value: checkboxValue,
-                                          onChanged: onCheckboxChanged,
-                                        ),
-                                        SizedBox.square(
-                                          dimension: 16,
-                                          child: GlassButton(
-                                            secondary: true,
-                                            padding: EdgeInsets.zero,
-                                            radius: 4,
-                                            onTap: _shareSelectedFiles,
-                                            child: MacosIcon(
-                                              FluentIcons.share_16_regular,
-                                              color: MacosColors.labelColor
-                                                  .resolvedColor(context),
-                                              size: 12,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: 22,
-                                          height: 16,
-                                          child: GlassButton(
-                                            secondary: true,
-                                            onTap: () {
-                                              setState(() {
-                                                _displayMode = _displayMode ==
-                                                        DisplayMode.grid
-                                                    ? DisplayMode.list
-                                                    : DisplayMode.grid;
-                                              });
-                                            },
-                                            padding: EdgeInsets.zero,
-                                            borderRadius: const BorderRadius
-                                                    .all(Radius.circular(8))
-                                                .copyWith(
-                                                    topRight:
-                                                        const Radius.circular(
-                                                            24)),
-                                            child: Transform.translate(
-                                              offset: const Offset(-1, .5),
-                                              child: MacosIcon(
-                                                _displayMode == DisplayMode.grid
-                                                    ? FluentIcons
-                                                        .text_bullet_list_ltr_16_regular
-                                                    : FluentIcons
-                                                        .grid_16_regular,
-                                                color: MacosColors.labelColor
-                                                    .resolvedColor(context),
-                                                size: 12,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -587,10 +602,11 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
                               style: TextStyle(
                                 color: _isDraggingItemIn
                                     ? MacosColors.controlAccentColor
-                                    : MacosColors.labelColor
+                                    : MacosColors.secondaryLabelColor
                                         .resolvedColor(context),
+                                fontSize: 13,
                               ),
-                              child: const Text('Drop files here'),
+                              child: const Text('放置或粘贴你的内容项'),
                             ),
                           ),
                         ),
@@ -608,11 +624,9 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
     selectedItems.value = Set.from(selectedItems())..remove(path);
   }
 
-
-
   @override
   void dispose() {
-    selectedItems.dispose();
+    dropChannel.removeListener(this);
     super.dispose();
   }
 }

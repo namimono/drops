@@ -12,7 +12,7 @@ final selectedItems = ValueNotifier<Set<String>>({});
 final archiveProgress = ValueNotifier<double>(-1);
 final isAboutApp = ValueNotifier<bool>(false);
 final isLicenseApp = ValueNotifier<bool>(false);
-final isLicenseValid = ValueNotifier<bool>(false);
+final isLicenseValid = ValueNotifier<bool>(true);
 final isCropApp = ValueNotifier<bool>(false);
 
 
@@ -62,7 +62,11 @@ final isMiscApp = ValueNotifier<bool>(false);
 // Update the existing variables or add if not present:
 late final SharedPreferences prefs;
 
-final appMode = ValueNotifier<AppMode>(AppMode.panel);
+final appMode = ValueNotifier<AppMode>(AppMode.pin);
+
+/// When true, an empty pin shelf stays visible (e.g. after shake invoke).
+/// Cleared when items are added, drag ends empty, or the user dismisses.
+bool keepEmptyShelfVisible = false;
 
 enum AppMode {
   panel._(),
@@ -97,11 +101,16 @@ extension AppModeEx on AppMode {
 }
 
 void handleModeChanged(AppMode mode, {bool force = false}) async {
+  // Dropover-style: pin is the default shelf. Toggling pin again keeps pin
+  // (hide via resetFrameAndHide). Other modes still collapse back to pin.
   if (mode == appMode() && !force) {
-    mode = AppMode.panel;
+    if (mode == AppMode.pin) {
+      return;
+    }
+    mode = AppMode.pin;
   }
   final appSize = switch (mode) {
-    AppMode.panel => AppSizes.panel,
+    AppMode.panel => AppSizes.pin,
     AppMode.pin => AppSizes.pin,
     AppMode.minify => AppSizes.minify,
     AppMode.archive => AppSizes.archive,
@@ -116,17 +125,13 @@ void handleModeChanged(AppMode mode, {bool force = false}) async {
   );
   dropChannel.setFrame(rect, animate: true);
 
-  if (appMode() == AppMode.panel) {
-    await Future.delayed(Durations.short2);
-  }
-
   appMode.value = mode;
 }
 
-void handleDefaultMode() => handleModeChanged(AppMode.panel);
+void handleDefaultMode() => handleModeChanged(AppMode.pin, force: true);
 
 final setupStep = ValueNotifier<SetupStep?>(null);
-final setupSuccess = ValueNotifier<bool?>(null);
+final setupSuccess = ValueNotifier<bool?>(true);
 final setupError = ValueNotifier<SetupStep?>(null); // Add this line
 
 // Update states
