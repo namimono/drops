@@ -28,6 +28,9 @@ final dropChannel = DropChannel._();
 enum PopoverEdge { left, right, top, bottom }
 
 class DropChannel {
+  static const _maxFileIconCacheEntries = 256;
+  final Map<String, Future<Uint8List>> _fileIconCache = {};
+
   DropChannel._() {
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
@@ -37,14 +40,24 @@ class DropChannel {
             listener.shakeDetected(Offset(args[0], args[1]));
           }
 
-        case 'draggingSessionEnded':
-          final int operation = call.arguments;
+        case 'shelfInvoked':
+          final List<double> args = call.arguments.cast<double>();
           for (final listener in listeners) {
-            listener.onDragSessionEnded(switch (operation) {
-              1 => DropOperation.copy,
-              16 => DropOperation.move,
-              _ => throw Exception('Invalid operation'),
-            });
+            listener.shelfInvoked(Offset(args[0], args[1]));
+          }
+
+        case 'draggingSessionEnded':
+          // macOS NSDragOperation: none=0, copy=1, link=2, move=16.
+          // Cancelled / drop-on-self returns 0 — must not throw or UI stays stuck.
+          final int operation = call.arguments as int;
+          final dropOperation = switch (operation) {
+            1 => DropOperation.copy,
+            2 => DropOperation.link,
+            16 => DropOperation.move,
+            _ => DropOperation.none,
+          };
+          for (final listener in listeners) {
+            listener.onDragSessionEnded(dropOperation);
           }
 
         case 'menuItemClicked':
@@ -87,7 +100,7 @@ class DropChannel {
           // Native Cmd+V / Edit → Paste: same shelf update as a drop.
           final paths = List<String>.from(call.arguments as List);
           if (paths.isNotEmpty) {
-            items.value = items().union(paths.toSet());
+            items.value = itemsWithNewestFirst(paths);
             selectedItems.value = selectedItems().union(paths.toSet());
           }
 
@@ -197,8 +210,42 @@ class DropChannel {
     await _channel.invokeMethod('performDragSession', fileURLs);
   }
 
-  Future<Uint8List> getFileIcon(String path) async {
-    return await _channel.invokeMethod('getFileIcon', path);
+  Future<Uint8List> getFileIcon(String path) {
+    final cached = _fileIconCache[path];
+    if (cached != null) return cached;
+
+    final request = _loadFileIcon(path);
+    _fileIconCache[path] = request;
+    if (_fileIconCache.length > _maxFileIconCacheEntries) {
+      _fileIconCache.remove(_fileIconCache.keys.first);
+    }
+    return request;
+  }
+
+  Future<Uint8List> _loadFileIcon(String path) async {
+    try {
+      return await _channel.invokeMethod<Uint8List>('getFileIcon', path) ??
+          Uint8List(0);
+    } catch (_) {
+      _fileIconCache.remove(path);
+      rethrow;
+    }
+  }
+
+  /// Toggles macOS Quick Look for the given local file paths (Finder Space).
+  /// Returns whether the preview panel ended up visible. No-op on Windows.
+  Future<bool> quickLook(List<String> paths) async {
+    if (Platform.isWindows || paths.isEmpty) return false;
+    try {
+      final result = await _channel.invokeMethod('quickLook', paths);
+      return result == true;
+    } on PlatformException catch (e) {
+      logger.log('Error showing Quick Look: ${e.message}');
+      return false;
+    } catch (e) {
+      logger.log('Unexpected error showing Quick Look: $e');
+      return false;
+    }
   }
 
   Future<void> setFrame(Rect rect,
@@ -429,11 +476,12 @@ class DropChannel {
 
         _isProcessRunning = true;
         final completer = Completer<ProcessResult>();
-        
+
         try {
-          final process = await Process.start(command, arguments, runInShell: true);
+          final process =
+              await Process.start(command, arguments, runInShell: true);
           _currentProcess = process;
-          
+
           var stdout = StringBuffer();
           var stderr = StringBuffer();
 
@@ -572,6 +620,8 @@ class DropChannel {
 }
 
 enum DropOperation {
+  /// Drag cancelled or dropped with no effect (e.g. back onto the shelf).
+  none,
   move,
   copy,
   link,
@@ -587,6 +637,7 @@ mixin class DragDropListener {
   void onDraggingUpdated(Offset position) {}
   void onDragPerform(List<String> paths) {}
   void shakeDetected(Offset position) {}
+  void shelfInvoked(Offset position) {}
   void onDragSessionEnded(DropOperation operation) {}
   void onLocationChange({
     required int hwnd,

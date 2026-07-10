@@ -2,6 +2,7 @@ import AppKit
 import Cocoa
 import Compression
 import FlutterMacOS
+import QuickLookUI
 
 enum ImageFormat: Int {
   case png, jpeg, tiff, webp
@@ -18,6 +19,7 @@ class MainFlutterWindow: NSWindow {
   var compressing = false
 
   var iconCache = NSCache<NSString, NSImage>()
+  var iconDataCache = NSCache<NSString, NSData>()
   var popover: NSPopover?
 
   var dropdownChannel: FlutterMethodChannel!
@@ -62,6 +64,41 @@ class MainFlutterWindow: NSWindow {
     setupShakeDetector()
 
     setupMenuBar()
+
+    GlobalHotkeyManager.shared.start { [weak self] in
+      guard let self else { return }
+      NSLog("[HOTKEY] Shortcut pressed — invoking shelf")
+      let position = NSEvent.mouseLocation
+      self.channel.invokeMethod("shelfInvoked", arguments: [position.x, position.y])
+      NSApp.activate(ignoringOtherApps: true)
+      // Flutter owns shelf state and positioning. If its handler is not ready
+      // yet, still make the collection shelf visible instead of dropping the
+      // global shortcut silently.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+        guard let self, !self.isVisible else { return }
+        let size = NSSize(width: 200, height: 200)
+        let proposedFrame = NSRect(
+          x: position.x - size.width / 2,
+          y: position.y,
+          width: size.width,
+          height: size.height
+        )
+        let screen = NSScreen.screens.first {
+          NSMouseInRect(position, $0.frame, false)
+        }
+        let bounds = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? proposedFrame
+        let frame = NSRect(
+          x: max(bounds.minX, min(proposedFrame.minX, bounds.maxX - size.width)),
+          y: max(bounds.minY, min(proposedFrame.minY, bounds.maxY - size.height)),
+          width: size.width,
+          height: size.height
+        )
+        NSLog("[HOTKEY] Flutter did not show shelf in time — using native fallback")
+        self.setFrame(frame, display: true)
+        self.alphaValue = 1
+        self.makeKeyAndOrderFront(nil)
+      }
+    }
 
     processHandler = ProcessHandler(channel: channel)
 
@@ -418,13 +455,23 @@ class MainFlutterWindow: NSWindow {
     case "hide":
       self.setIsVisible(false)
       result(nil)
+    case "getGlobalHotkeyStatus":
+      result([
+        "enabled": UserDefaults.standard.object(forKey: GlobalHotkeyManager.enabledKey) as? Bool ?? true,
+        "keyCode": UserDefaults.standard.object(forKey: GlobalHotkeyManager.keyCodeKey)
+          as? Int ?? Int(GlobalHotkeyManager.defaultKeyCode),
+        "modifiers": UserDefaults.standard.object(forKey: GlobalHotkeyManager.modifiersKey)
+          as? Int ?? Int(GlobalHotkeyManager.defaultModifiers),
+      ])
     case "performDragWindow":
       if self.currentEvent != nil {
         self.performDrag(with: self.currentEvent!)
       }
+      result(nil)
     case "performDragSession":
       let fileURLs = call.arguments as! [String]
       performDragSession(fileURLs: fileURLs)
+      result(nil)
 
     case "getFileIcon":
       if let path = call.arguments as? String {
@@ -433,6 +480,17 @@ class MainFlutterWindow: NSWindow {
         result(
           FlutterError(code: "INVALID_ARGUMENT", message: "Path must be a string", details: nil))
       }
+
+    case "quickLook":
+      guard let paths = call.arguments as? [String], !paths.isEmpty else {
+        result(
+          FlutterError(
+            code: "INVALID_ARGUMENT", message: "Paths must be a non-empty string array",
+            details: nil))
+        return
+      }
+      let visible = QuickLookPreviewController.shared.toggle(paths: paths)
+      result(visible)
 
     case "setFrame":
       if let args = call.arguments as? [CGFloat?], args.count == 5 {
@@ -462,11 +520,18 @@ class MainFlutterWindow: NSWindow {
         let constrainedRect = NSRect(x: constrainedX, y: constrainedY, width: width, height: height)
 
         if animate {
-          self.animator().setFrame(constrainedRect, display: true, animate: true)
+          NSAnimationContext.runAnimationGroup { context in
+            // Keep native resize aligned with Flutter's 180 ms content switch.
+            context.duration = 0.18
+            context.allowsImplicitAnimation = true
+            self.animator().setFrame(constrainedRect, display: true, animate: true)
+          } completionHandler: {
+            result(nil)
+          }
         } else {
           self.setFrame(constrainedRect, display: true)
+          result(nil)
         }
-        result(nil)
       } else {
         result(
           FlutterError(
@@ -494,14 +559,27 @@ class MainFlutterWindow: NSWindow {
         return
       }
 
-      self.setIsVisible(visible)
-      self.animator().alphaValue = visible ? 1.0 : 0.0
       if visible {
-        // Become key so Cmd+V / menu Paste reach this floating shelf window.
+        self.alphaValue = 0.0
+        self.setIsVisible(true)
         self.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        NSAnimationContext.runAnimationGroup { context in
+          context.duration = 0.16
+          self.animator().alphaValue = 1.0
+        } completionHandler: {
+          result(nil)
+        }
+      } else {
+        NSAnimationContext.runAnimationGroup { context in
+          context.duration = 0.16
+          self.animator().alphaValue = 0.0
+        } completionHandler: {
+          self.orderOut(nil)
+          self.alphaValue = 1.0
+          result(nil)
+        }
       }
-      result(nil)
 
     case "orderFront":
       self.orderFront(nil)
@@ -806,20 +884,65 @@ class MainFlutterWindow: NSWindow {
   }
 
   func getFileIcon(path: String, result: @escaping FlutterResult) {
+    if let cachedData = self.iconDataCache.object(forKey: path as NSString) {
+      result(FlutterStandardTypedData(bytes: cachedData as Data))
+      return
+    }
+
+    let icon: NSImage
     if let cachedIcon = self.iconCache.object(forKey: path as NSString) {
-      result(self.iconToFlutterData(cachedIcon))
+      icon = cachedIcon
     } else {
-      let icon = NSWorkspace.shared.icon(forFile: path)
+      icon = NSWorkspace.shared.icon(forFile: path)
       self.iconCache.setObject(icon, forKey: path as NSString)
-      result(self.iconToFlutterData(icon))
+    }
+
+    guard let cgImage = icon.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+      result(
+        FlutterError(
+          code: "ICON_CONVERSION_FAILED", message: "Unable to read the file icon", details: path))
+      return
+    }
+
+    DispatchQueue.global(qos: .userInitiated).async {
+      let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
+      guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+        DispatchQueue.main.async {
+          result(
+            FlutterError(
+              code: "ICON_CONVERSION_FAILED", message: "Unable to encode the file icon",
+              details: path))
+        }
+        return
+      }
+
+      DispatchQueue.main.async {
+        self.iconDataCache.setObject(pngData as NSData, forKey: path as NSString)
+        result(FlutterStandardTypedData(bytes: pngData))
+      }
     }
   }
 
-  func iconToFlutterData(_ icon: NSImage) -> FlutterStandardTypedData {
-    let cgImage = icon.cgImage(forProposedRect: nil, context: nil, hints: nil)!
-    let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
-    let pngData = bitmapRep.representation(using: .png, properties: [:])!
-    return FlutterStandardTypedData(bytes: pngData)
+  // MARK: - Quick Look panel control
+  //
+  // QLPreviewPanel walks the responder chain looking for an object that
+  // accepts control. Without these overrides the panel never appears when
+  // triggered from Flutter.
+
+  override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+    true
+  }
+
+  override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+    let controller = QuickLookPreviewController.shared
+    panel.dataSource = controller
+    panel.delegate = controller
+    panel.reloadData()
+  }
+
+  override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+    panel.dataSource = nil
+    panel.delegate = nil
   }
 
   func cleanup() {
@@ -1068,6 +1191,7 @@ class MainFlutterWindow: NSWindow {
       let menuItems = [
         ("Show", 1),
         ("Hide", 2),
+        ("Settings…", -2),
         ("About Shakepin", 3),
         ("Quit", -1),
       ]
@@ -1171,6 +1295,10 @@ class MainFlutterWindow: NSWindow {
       // Handle theme changes if needed
       NSLog("[SETTINGS] Handling theme setting change")
       break
+    case GlobalHotkeyManager.enabledKey,
+         GlobalHotkeyManager.keyCodeKey,
+         GlobalHotkeyManager.modifiersKey:
+      GlobalHotkeyManager.shared.reload()
     default:
       NSLog("[SETTINGS] Ignoring setting change for key: %@", key)
       break
@@ -1186,6 +1314,8 @@ class MainFlutterWindow: NSWindow {
     // Handle the menu item click based on the sender's tag or title
     if sender.tag == -1 {
       NSApplication.shared.terminate(nil)
+    } else if sender.tag == -2 {
+      showSettingsWindow()
     } else {
       channel.invokeMethod("menuItemClicked", arguments: sender.tag)
     }

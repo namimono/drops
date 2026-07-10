@@ -552,7 +552,7 @@ class _LicenseAppState extends State<LicenseApp> {
 
   void _handleClose() {
     isLicenseApp.value = false;
-    handleDefaultMode();
+    appMode.value = AppMode.pin;
     resetFrameAndHide();
   }
 }

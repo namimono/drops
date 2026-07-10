@@ -28,8 +28,8 @@ class DropTarget: NSView {
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        let position = sender.draggingLocation
-        channel.invokeMethod("dragUpdated", arguments: [label, position.x, position.y])
+        // No current drop target consumes intermediate positions. Keeping this
+        // callback native avoids a 60–120 Hz platform-channel event stream.
         return .copy
     }
 
@@ -85,7 +85,9 @@ class DropTarget: NSView {
             } else if let string = item.string(forType: .string) {
                 // Prefer plain text over HTML/RTF — many apps put both on the
                 // pasteboard (e.g. browsers, Codex), and users usually want txt.
-                let path = saveStringToTemp(string: string, directory: dropDirectory, fileName: "文字档.txt")
+                let fileName = fileNameFromText(string, fallback: "文字档")
+                let path = saveStringToTemp(
+                    string: string, directory: dropDirectory, fileName: fileName)
                 if !path.isEmpty { paths.append(path) }
                 NSLog("Saved string: \(path)")
             } else if let rtfData = item.data(forType: .rtf) {
@@ -105,8 +107,9 @@ class DropTarget: NSView {
                 if !path.isEmpty { paths.append(path) }
                 NSLog("Saved PDF data: \(path)")
             } else if let tabularText = item.string(forType: .tabularText) {
+                let fileName = fileNameFromText(tabularText, fallback: "表格")
                 let path = saveStringToTemp(
-                    string: tabularText, directory: dropDirectory, fileName: "表格.txt")
+                    string: tabularText, directory: dropDirectory, fileName: fileName)
                 if !path.isEmpty { paths.append(path) }
                 NSLog("Saved tabular text: \(path)")
             } else if let soundData = item.data(forType: .sound) {
@@ -124,6 +127,41 @@ class DropTarget: NSView {
         }
 
         return paths
+    }
+
+    /// Builds a safe `.txt` file name from the leading characters of `string`.
+    ///
+    /// Takes the first 15 characters (after trimming), strips characters that
+    /// are illegal or awkward in macOS file names, and falls back to
+    /// `fallback` when nothing usable remains.
+    private static func fileNameFromText(
+        _ string: String, fallback: String, ext: String = "txt"
+    ) -> String {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = String(trimmed.prefix(15))
+
+        var sanitized = ""
+        for scalar in prefix.unicodeScalars {
+            // Path separator, legacy HFS colon, and C0 controls (incl. newline/tab).
+            if scalar == "/" || scalar == "\\" || scalar == ":" || scalar.value < 32 {
+                continue
+            }
+            // Other characters Finder / shells commonly reject.
+            switch scalar {
+            case "*", "?", "\"", "<", ">", "|":
+                continue
+            default:
+                sanitized.unicodeScalars.append(scalar)
+            }
+        }
+
+        // Avoid hidden files and trailing junk from sanitization.
+        let cleaned = sanitized
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+
+        let base = cleaned.isEmpty ? fallback : cleaned
+        return "\(base).\(ext)"
     }
 
     /// Creates (and returns) a fresh sub-directory under the temp root to

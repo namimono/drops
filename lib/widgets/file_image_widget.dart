@@ -28,10 +28,20 @@ class _FileImageWidgetState extends State<FileImageWidget> {
     _loadIcon();
   }
 
+  @override
+  void didUpdateWidget(covariant FileImageWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) {
+      _iconData = null;
+      _loadIcon();
+    }
+  }
+
   Future<void> _loadIcon() async {
+    final requestedPath = widget.path;
     try {
-      final iconData = await dropChannel.getFileIcon(widget.path);
-      if (mounted) {
+      final iconData = await dropChannel.getFileIcon(requestedPath);
+      if (mounted && widget.path == requestedPath) {
         setState(() {
           _iconData = iconData;
         });
@@ -51,16 +61,24 @@ class _FileImageWidgetState extends State<FileImageWidget> {
       );
     }
 
-    return Image.memory(
-      _iconData!,
-      width: widget.size,
-      height: widget.size,
-      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        if (wasSynchronouslyLoaded || frame != null) {
-          return child;
-        }
-        return const ProgressCircle();
-      },
+    final cacheSize =
+        (widget.size * MediaQuery.devicePixelRatioOf(context)).ceil();
+    return RepaintBoundary(
+      child: Image.memory(
+        _iconData!,
+        width: widget.size,
+        height: widget.size,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        filterQuality: FilterQuality.low,
+        gaplessPlayback: true,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
+          }
+          return const ProgressCircle();
+        },
+      ),
     );
   }
 }

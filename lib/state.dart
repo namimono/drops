@@ -15,7 +15,6 @@ final isLicenseApp = ValueNotifier<bool>(false);
 final isLicenseValid = ValueNotifier<bool>(true);
 final isCropApp = ValueNotifier<bool>(false);
 
-
 final isSetupApp = ValueNotifier<bool>(false);
 
 const isAppStore = appFlavor != 'oss';
@@ -32,7 +31,7 @@ Future<void> loadOutputDirectory() async {
   if (outputDirectory.value == null) {
     final String? selectedDirectory = await getDirectoryPath();
     if (selectedDirectory != null) {
-      updateOutputDirectory(selectedDirectory); 
+      updateOutputDirectory(selectedDirectory);
     }
   }
 }
@@ -55,6 +54,13 @@ extension ListenableSetEx<T> on ValueNotifier<Set<T>> {
   void remove(T item) =>
       value = value.where((element) => element != item).toSet();
   void clear() => value = {};
+}
+
+/// Newest-first shelf order: new paths lead, existing unique paths follow.
+Set<String> itemsWithNewestFirst(Iterable<String> incoming) {
+  final next = incoming.toList();
+  final rest = items().difference(next.toSet());
+  return {...next, ...rest};
 }
 
 final isMiscApp = ValueNotifier<bool>(false);
@@ -100,7 +106,7 @@ extension AppModeEx on AppMode {
       };
 }
 
-void handleModeChanged(AppMode mode, {bool force = false}) async {
+Future<void> handleModeChanged(AppMode mode, {bool force = false}) async {
   // Dropover-style: pin is the default shelf. Toggling pin again keeps pin
   // (hide via resetFrameAndHide). Other modes still collapse back to pin.
   if (mode == appMode() && !force) {

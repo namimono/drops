@@ -14,6 +14,7 @@ import 'package:shakepin/utils/utils.dart';
 import 'package:shakepin/widgets/file_image_widget.dart';
 import 'package:super_context_menu/super_context_menu.dart';
 import 'package:path/path.dart' as path;
+import 'package:url_launcher/url_launcher.dart';
 
 class DroppedItem extends StatefulWidget {
   const DroppedItem({
@@ -27,6 +28,18 @@ class DroppedItem extends StatefulWidget {
     required this.onEnter,
     required this.onExit,
     required this.displayMode,
+    this.isBeingDragged = false,
+    this.canMergeSelected = false,
+    this.onMergeSelected,
+    this.onInternalDragStart,
+    this.onInternalDragUpdate,
+    this.onInternalDragEnd,
+    this.onInternalDragCancel,
+    this.shouldStartExternalDrag,
+    this.isMergeDragging = false,
+    this.isMergeTarget = false,
+    this.isMergeArmed = false,
+    this.mergeItemCount = 0,
   });
 
   final String path;
@@ -38,16 +51,42 @@ class DroppedItem extends StatefulWidget {
   final VoidCallback onEnter;
   final VoidCallback onExit;
   final DisplayMode displayMode;
+  final bool isBeingDragged;
+  final bool canMergeSelected;
+  final VoidCallback? onMergeSelected;
+  final VoidCallback? onInternalDragStart;
+  final ValueChanged<Offset>? onInternalDragUpdate;
+  final ValueChanged<Offset>? onInternalDragEnd;
+  final VoidCallback? onInternalDragCancel;
+  final bool Function(Offset globalPosition)? shouldStartExternalDrag;
+  final bool isMergeDragging;
+  final bool isMergeTarget;
+  final bool isMergeArmed;
+  final int mergeItemCount;
 
   @override
   State<DroppedItem> createState() => _DroppedItemState();
 }
 
 class _DroppedItemState extends State<DroppedItem> {
+  DateTime? _lastTapAt;
+  String _fileSize = '';
+
   @override
   void initState() {
     appMode.addListener(appModeListener);
     super.initState();
+    _loadFileSize();
+  }
+
+  @override
+  void didUpdateWidget(covariant DroppedItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path ||
+        oldWidget.displayMode != widget.displayMode) {
+      _fileSize = '';
+      _loadFileSize();
+    }
   }
 
   @override
@@ -60,21 +99,81 @@ class _DroppedItemState extends State<DroppedItem> {
     setState(() {});
   }
 
+  Future<void> _loadFileSize() async {
+    if (widget.displayMode != DisplayMode.list || isUrl(widget.path)) return;
+
+    final requestedPath = widget.path;
+    try {
+      final size = await File(requestedPath).length();
+      if (!mounted || widget.path != requestedPath) return;
+      setState(() => _fileSize = formatFileSize(size));
+    } on FileSystemException {
+      if (!mounted || widget.path != requestedPath) return;
+      setState(() => _fileSize = '');
+    }
+  }
+
   bool get isDisabled => !appMode().isFileCompatible(widget.path);
 
+  bool get _isLifted => widget.isBeingDragged || widget.isMergeDragging;
+
   Color _selectionFill(BuildContext context) {
-    if (!widget.isSelected) return Colors.transparent;
     final isDark = MacosTheme.brightnessOf(context).isDark;
-    // Light gray selection only — no hover background.
-    return isDark
-        ? Colors.white.withValues(alpha: 0.14)
-        : const Color(0xFFE5E5E5);
+    // Keep the same RGB channels at both ends of the animation. Tweening from
+    // Colors.transparent would interpolate from transparent black and create
+    // a dark-gray flash in the middle frames.
+    if (isDark) {
+      return Colors.white.withValues(alpha: widget.isSelected ? 0.14 : 0);
+    }
+    return widget.isSelected
+        ? const Color(0xFFE5E5E5)
+        : const Color(0x00E5E5E5);
+  }
+
+  /// Opens with the default app (files) or the system browser (URLs).
+  Future<void> _openWithDefaultApp() async {
+    try {
+      if (isUrl(widget.path)) {
+        final uri = Uri.parse(widget.path);
+        if (!await launchUrl(uri)) {
+          throw Exception('launchUrl returned false for ${widget.path}');
+        }
+        return;
+      }
+      final result = await cli.run('open', [widget.path]);
+      if (result.exitCode != 0) {
+        throw Exception(result.stderr);
+      }
+    } catch (e) {
+      logger.log('Error opening item: $e');
+    }
+  }
+
+  /// Select immediately on tap; open on a second tap within the double-click
+  /// window. Avoids Flutter's onTap/onDoubleTap gesture arena delay (~300ms).
+  void _handleTap() {
+    final now = DateTime.now();
+    final last = _lastTapAt;
+    _lastTapAt = now;
+    if (last != null &&
+        now.difference(last) < const Duration(milliseconds: 300)) {
+      _lastTapAt = null;
+      _openWithDefaultApp();
+      return;
+    }
+    widget.onSelect();
   }
 
   @override
   Widget build(BuildContext context) {
     menuProvider(request) => Menu(
           children: [
+            MenuAction(
+              title: 'Open',
+              callback: () {
+                _openWithDefaultApp();
+              },
+            ),
             MenuAction(
               title: 'Show in Finder',
               callback: () async {
@@ -84,10 +183,15 @@ class _DroppedItemState extends State<DroppedItem> {
                     throw Exception(result.stderr);
                   }
                 } catch (e) {
-                  logger.log('Error opening file: $e');
+                  logger.log('Error revealing file: $e');
                 }
               },
             ),
+            if (widget.canMergeSelected && widget.onMergeSelected != null)
+              MenuAction(
+                title: '合并文本',
+                callback: widget.onMergeSelected!,
+              ),
             MenuAction(
               title: 'Remove',
               callback: () {
@@ -116,18 +220,37 @@ class _DroppedItemState extends State<DroppedItem> {
         : FileImageWidget(path: widget.path, size: iconSize);
 
     if (widget.displayMode == DisplayMode.list) {
-      final file = File(widget.path);
       final fileName =
           isUrl(widget.path) ? widget.path : path.basename(widget.path);
-      final fileSize =
-          file.existsSync() ? formatFileSize(file.lengthSync()) : '';
 
       child = GestureDetector(
-        onTap: widget.onSelect,
-        child: Container(
+        onTap: _handleTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
           decoration: BoxDecoration(
             color: _selectionFill(context),
             borderRadius: BorderRadius.circular(8),
+            border: widget.isMergeArmed
+                ? Border.all(
+                    color: MacosColors.controlAccentColor,
+                    width: 2,
+                  )
+                : widget.isMergeTarget
+                    ? Border.all(
+                        color: MacosColors.controlAccentColor
+                            .withValues(alpha: 0.55),
+                      )
+                    : null,
+            boxShadow: (_isLifted || widget.isMergeArmed)
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
+                : null,
           ),
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
           child: Row(
@@ -149,7 +272,7 @@ class _DroppedItemState extends State<DroppedItem> {
               ),
               const SizedBox(width: 8),
               Text(
-                fileSize,
+                _fileSize,
                 style: TextStyle(
                   fontSize: 11,
                   color: secondaryColor,
@@ -160,17 +283,38 @@ class _DroppedItemState extends State<DroppedItem> {
         ),
       );
     } else {
-      final fileName = isUrl(widget.path)
-          ? widget.path
-          : path.basename(widget.path);
+      final fileName =
+          isUrl(widget.path) ? widget.path : path.basename(widget.path);
 
       child = GestureDetector(
-        onTap: widget.onSelect,
-        child: Container(
+        onTap: _handleTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
           height: 88,
           decoration: BoxDecoration(
             color: _selectionFill(context),
             borderRadius: BorderRadius.circular(10),
+            border: widget.isMergeArmed
+                ? Border.all(
+                    color: MacosColors.controlAccentColor,
+                    width: 2,
+                  )
+                : widget.isMergeTarget
+                    ? Border.all(
+                        color: MacosColors.controlAccentColor
+                            .withValues(alpha: 0.55),
+                      )
+                    : null,
+            boxShadow: (_isLifted || widget.isMergeArmed)
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
           ),
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           child: Stack(
@@ -224,8 +368,40 @@ class _DroppedItemState extends State<DroppedItem> {
       );
     }
 
+    if (widget.isMergeArmed) {
+      child = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          child,
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: MacosColors.controlAccentColor.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(5),
+            ),
+            child: Text(
+              widget.mergeItemCount > 1
+                  ? '合并 ${widget.mergeItemCount} 段文本'
+                  : '合并文本',
+              style: const TextStyle(
+                fontSize: 10,
+                color: MacosColors.controlAccentColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return CustomDragGesture(
       onDragStart: widget.onDragStart,
+      onInternalDragStart: widget.onInternalDragStart,
+      onInternalDragUpdate: widget.onInternalDragUpdate,
+      onInternalDragEnd: widget.onInternalDragEnd,
+      onInternalDragCancel: widget.onInternalDragCancel,
+      shouldStartExternalDrag: widget.shouldStartExternalDrag,
       child: ContextMenuWidget(
         menuProvider: menuProvider,
         child: MouseRegion(
@@ -238,7 +414,31 @@ class _DroppedItemState extends State<DroppedItem> {
               }
             });
           },
-          child: child,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
+            // Ghost silhouette while the OS drag preview follows the cursor.
+            opacity: widget.isBeingDragged
+                ? 0.28
+                : widget.isMergeDragging
+                    ? 0.45
+                    : 1,
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              scale: _isLifted
+                  ? 1.06
+                  : widget.isMergeArmed
+                      ? 1.04
+                      : 1,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                offset: _isLifted ? const Offset(0, -0.04) : Offset.zero,
+                child: child,
+              ),
+            ),
+          ),
         ),
       ),
     );

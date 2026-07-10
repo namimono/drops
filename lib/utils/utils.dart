@@ -14,7 +14,7 @@ sealed class AppSizes {
   static const about = Size(360, 360);
   static const license = Size(360, 450);
   static const misc = Size(240 + 48 + 12 + 16, 468);
-  static const crop = Size(980,680);
+  static const crop = Size(980, 680);
 
   /// Dropover-style shelf: collapsed stack (default).
   static const pin = Size(200, 200);
@@ -162,18 +162,36 @@ extension IterableExtension<T> on Iterable<String> {
   Iterable<String> get urls => where((path) => isUrl(path));
 }
 
-void resetFrameAndHide() async {
-  await Future.delayed(Durations.short1);
+Future<void>? _hideWindowOperation;
+var _windowVisibilityGeneration = 0;
+
+/// Cancels a pending hide before showing the shelf again.
+void cancelPendingWindowHide() {
+  _windowVisibilityGeneration++;
+}
+
+Future<void> resetFrameAndHide() {
+  final pending = _hideWindowOperation;
+  if (pending != null) return pending;
+
+  final generation = ++_windowVisibilityGeneration;
+  late final Future<void> operation;
+  operation = _resetFrameAndHide(generation);
+  _hideWindowOperation = operation;
+  operation.whenComplete(() {
+    if (identical(_hideWindowOperation, operation)) {
+      _hideWindowOperation = null;
+    }
+  });
+  return operation;
+}
+
+Future<void> _resetFrameAndHide(int generation) async {
   final width = AppSizes.pin.width;
   final height = Platform.isMacOS ? 48.0 : 65.0;
-  if (Platform.isWindows) {
-    await dropChannel.setMinimumSize(
-      Size(
-        width,
-        height,
-      ),
-    );
-  }
+  await dropChannel.setMinimumSize(Size(width, height));
+  if (generation != _windowVisibilityGeneration) return;
+
   await dropChannel.setFrame(
     Rect.fromCenter(
       center: await dropChannel.center(),
@@ -184,12 +202,13 @@ void resetFrameAndHide() async {
   );
   logger.log('frame adjustment complete');
 
-  await Future.delayed(Durations.short4);
+  if (generation != _windowVisibilityGeneration) return;
   await dropChannel.setVisible(false);
   logger.log('Window hidden successfully');
 }
 
 Future<void> showApp() async {
+  cancelPendingWindowHide();
   final center = await dropChannel.center();
   Size appSize;
 

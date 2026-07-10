@@ -7,6 +7,9 @@ struct UnifiedSettingsView: View {
   // General settings
   @AppStorage("launchAtLogin") private var launchAtLogin: Bool = false
   @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
+  @AppStorage(GlobalHotkeyManager.enabledKey) private var globalHotkeyEnabled: Bool = true
+  @AppStorage(GlobalHotkeyManager.keyCodeKey) private var globalHotkeyKeyCode: Int = Int(GlobalHotkeyManager.defaultKeyCode)
+  @AppStorage(GlobalHotkeyManager.modifiersKey) private var globalHotkeyModifiers: Int = Int(GlobalHotkeyManager.defaultModifiers)
 
   // CLI Tools settings
   @AppStorage("ffmpegPath") private var ffmpegPath: String = ""
@@ -17,6 +20,7 @@ struct UnifiedSettingsView: View {
   @AppStorage("sevenZipPath") private var sevenZipPath: String = ""
 
   @State private var hoveredCard: String? = nil
+  @State private var isRecordingGlobalHotkey = false
 
   var body: some View {
     ScrollView {
@@ -82,6 +86,76 @@ struct UnifiedSettingsView: View {
               NSLog("[SETTINGS] showMenuBarIcon onChange triggered - new value: %@", newValue ? "true" : "false")
               SettingsBridge.shared.notifySettingChanged(key: "showMenuBarIcon", value: newValue)
             }
+
+            SettingsToggleRow(
+              title: "Global Shortcut",
+              description: "Show the collection shelf at the cursor",
+              icon: "command",
+              iconColor: .purple,
+              isOn: $globalHotkeyEnabled,
+              onChange: { newValue in
+                SettingsBridge.shared.notifySettingChanged(
+                  key: GlobalHotkeyManager.enabledKey,
+                  value: newValue
+                )
+              }
+            )
+
+            HStack(spacing: 12) {
+              ZStack {
+                Circle()
+                  .fill(Color.purple.opacity(0.15))
+                  .frame(width: 28, height: 28)
+                Image(systemName: "keyboard")
+                  .font(.system(size: 14, weight: .medium))
+                  .foregroundColor(.purple)
+              }
+
+              VStack(alignment: .leading, spacing: 2) {
+                Text("Shortcut")
+                  .font(.system(size: 16, weight: .medium))
+                Text("May conflict with your input source shortcut")
+                  .font(.system(size: 13))
+                  .foregroundColor(.secondary)
+              }
+
+              Spacer()
+
+              ShortcutRecorder(
+                displayString: GlobalHotkeyManager.displayString(
+                  keyCode: UInt32(globalHotkeyKeyCode),
+                  modifiers: UInt32(globalHotkeyModifiers)
+                ),
+                isRecording: $isRecordingGlobalHotkey
+              ) { keyCode, modifiers in
+                globalHotkeyKeyCode = Int(keyCode)
+                globalHotkeyModifiers = Int(modifiers)
+                SettingsBridge.shared.notifySettingChanged(
+                  key: GlobalHotkeyManager.keyCodeKey,
+                  value: Int(keyCode)
+                )
+                SettingsBridge.shared.notifySettingChanged(
+                  key: GlobalHotkeyManager.modifiersKey,
+                  value: Int(modifiers)
+                )
+              }
+              .disabled(!globalHotkeyEnabled)
+
+              Button("Reset") {
+                globalHotkeyKeyCode = Int(GlobalHotkeyManager.defaultKeyCode)
+                globalHotkeyModifiers = Int(GlobalHotkeyManager.defaultModifiers)
+                SettingsBridge.shared.notifySettingChanged(
+                  key: GlobalHotkeyManager.keyCodeKey,
+                  value: globalHotkeyKeyCode
+                )
+                SettingsBridge.shared.notifySettingChanged(
+                  key: GlobalHotkeyManager.modifiersKey,
+                  value: globalHotkeyModifiers
+                )
+              }
+              .disabled(!globalHotkeyEnabled)
+            }
+            .padding(.vertical, 4)
           }
         }
         .onHover { isHovered in
@@ -482,7 +556,12 @@ struct UnifiedSettingsView: View {
     if alert.runModal() == .alertFirstButtonReturn {
       // Reset all UserDefaults
       let defaults = UserDefaults.standard
-      let keys = ["launchAtLogin", "showMenuBarIcon", "theme", "ffmpegPath", "galleryDlPath", "gifskiPath", "ytDlpPath", "imagemagickPath", "sevenZipPath"]
+      let keys = [
+        "launchAtLogin", "showMenuBarIcon", "theme", "ffmpegPath",
+        "galleryDlPath", "gifskiPath", "ytDlpPath", "imagemagickPath",
+        "sevenZipPath", GlobalHotkeyManager.enabledKey,
+        GlobalHotkeyManager.keyCodeKey, GlobalHotkeyManager.modifiersKey,
+      ]
 
       for key in keys {
         defaults.removeObject(forKey: key)
@@ -641,6 +720,90 @@ struct SettingsToggleRow: View {
         }
     }
     .padding(.vertical, 4)
+  }
+}
+
+struct ShortcutRecorder: View {
+  let displayString: String
+  @Binding var isRecording: Bool
+  let onShortcut: (UInt32, UInt32) -> Void
+
+  var body: some View {
+    ShortcutRecorderRepresentable(
+      isRecording: $isRecording,
+      onShortcut: onShortcut
+    )
+    .frame(width: 128, height: 28)
+    .background(
+      RoundedRectangle(cornerRadius: 6)
+        .fill(Color(NSColor.controlBackgroundColor))
+        .overlay(
+          RoundedRectangle(cornerRadius: 6)
+            .stroke(isRecording ? Color.accentColor : Color.secondary.opacity(0.3),
+                    lineWidth: isRecording ? 2 : 1)
+        )
+    )
+    .overlay(
+      Text(isRecording ? "Press shortcut…" : displayString)
+        .font(.system(size: 13, weight: .medium))
+        .foregroundColor(isRecording ? .accentColor : .primary)
+        .allowsHitTesting(false)
+    )
+  }
+}
+
+private struct ShortcutRecorderRepresentable: NSViewRepresentable {
+  @Binding var isRecording: Bool
+  let onShortcut: (UInt32, UInt32) -> Void
+
+  func makeNSView(context: Context) -> ShortcutCaptureView {
+    let view = ShortcutCaptureView()
+    view.onRecordingChanged = { isRecording = $0 }
+    view.onShortcut = onShortcut
+    return view
+  }
+
+  func updateNSView(_ view: ShortcutCaptureView, context: Context) {
+    view.isRecording = isRecording
+    view.onRecordingChanged = { isRecording = $0 }
+    view.onShortcut = onShortcut
+  }
+}
+
+private final class ShortcutCaptureView: NSView {
+  var isRecording = false
+  var onRecordingChanged: ((Bool) -> Void)?
+  var onShortcut: ((UInt32, UInt32) -> Void)?
+
+  override var acceptsFirstResponder: Bool { true }
+
+  override func mouseDown(with event: NSEvent) {
+    isRecording = true
+    window?.makeFirstResponder(self)
+    onRecordingChanged?(true)
+  }
+
+  override func keyDown(with event: NSEvent) {
+    guard isRecording else {
+      super.keyDown(with: event)
+      return
+    }
+
+    if event.keyCode == 53 {
+      isRecording = false
+      onRecordingChanged?(false)
+      return
+    }
+
+    let modifiers = GlobalHotkeyManager.modifiers(from: event.modifierFlags)
+    guard modifiers != 0 else {
+      NSSound.beep()
+      return
+    }
+
+    onShortcut?(UInt32(event.keyCode), modifiers)
+    isRecording = false
+    onRecordingChanged?(false)
   }
 }
 

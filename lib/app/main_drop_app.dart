@@ -63,35 +63,47 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
       return;
     }
     logger.log('Items empty, resetting frame and hiding');
-    handleDefaultMode();
+    // Do not call handleDefaultMode here: it starts a competing 200×200
+    // window animation while resetFrameAndHide is shrinking to 200×48.
+    appMode.value = AppMode.pin;
     resetFrameAndHide();
   }
 
   @override
   void shakeDetected(Offset position) async {
     logger.log('Shake detected at position: $position');
-    if (!isShakeDetected) {
-      logger.log('Processing first shake detection');
-      isShakeDetected = true;
-      keepEmptyShelfVisible = items().isEmpty;
-      // Dropover-style: always show the pin content box on invoke.
-      if (appMode() != AppMode.pin) {
-        handleModeChanged(AppMode.pin, force: true);
-      }
-      const appSize = AppSizes.pin;
-
-      logger.log('Setting frame with size: ${appSize.width}x${appSize.height}');
-      await dropChannel.setFrame(
-          Rect.fromCenter(
-            center: position + Offset(0, appSize.height / 2),
-            width: appSize.width,
-            height: appSize.height,
-          ),
-          animate: false);
-      await dropChannel.setVisible(true);
-      logger.log('Frame set and made visible');
-    }
+    if (isShakeDetected) return;
+    isShakeDetected = true;
+    await _invokeShelfAt(position);
     super.shakeDetected(position);
+  }
+
+  @override
+  void shelfInvoked(Offset position) async {
+    logger.log('Global shortcut invoked shelf at position: $position');
+    await _invokeShelfAt(position);
+    super.shelfInvoked(position);
+  }
+
+  Future<void> _invokeShelfAt(Offset position) async {
+    cancelPendingWindowHide();
+    keepEmptyShelfVisible = items().isEmpty;
+
+    // Dropover-style: always show the pin content box on invoke.
+    if (appMode() != AppMode.pin) {
+      await handleModeChanged(AppMode.pin, force: true);
+    }
+    const appSize = AppSizes.pin;
+
+    await dropChannel.setFrame(
+      Rect.fromCenter(
+        center: position + Offset(0, appSize.height / 2),
+        width: appSize.width,
+        height: appSize.height,
+      ),
+      animate: false,
+    );
+    await dropChannel.setVisible(true);
   }
 
   @override

@@ -138,6 +138,9 @@ class _DropTargetState extends State<DropTarget> implements DragDropListener {
   }
 
   @override
+  void shelfInvoked(Offset position) {}
+
+  @override
   void onDragSessionEnded(DropOperation operation) {
     widget.onDragSessionEnded?.call(operation);
   }

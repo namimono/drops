@@ -380,7 +380,7 @@ class _AboutAppState extends State<AboutApp> {
 
   Future<void> _handleCloseButtonPress() async {
     isAboutApp.value = false;
-    handleDefaultMode();
+    appMode.value = AppMode.pin;
     resetFrameAndHide();
   }
 }

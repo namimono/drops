@@ -47,10 +47,7 @@ class MainSidebar extends StatelessWidget {
                 tooltip: 'Drop files here to pin them',
                 onDragPerform: (paths) {
                   final addedPaths = paths;
-                  items.value = {
-                    ...items(),
-                    ...addedPaths,
-                  };
+                  items.value = itemsWithNewestFirst(addedPaths);
                   selectedItems.value = {
                     ...selectedItems(),
                     ...addedPaths,
@@ -74,10 +71,7 @@ class MainSidebar extends StatelessWidget {
                 onDragPerform: (paths) => handleAction(() {
                   final addedPaths = {...paths.videoPaths, ...paths.imagePaths};
                   onModeChanged(AppMode.minify);
-                  items.value = {
-                    ...items(),
-                    ...addedPaths,
-                  };
+                  items.value = itemsWithNewestFirst(addedPaths);
                   selectedItems.value = {
                     ...selectedItems(),
                     ...addedPaths,
@@ -99,10 +93,7 @@ class MainSidebar extends StatelessWidget {
                 tooltip: 'Drop files here to archive them into a .zip',
                 onDragPerform: (paths) => handleAction(() {
                   final addedPaths = paths;
-                  items.value = {
-                    ...items(),
-                    ...addedPaths,
-                  };
+                  items.value = itemsWithNewestFirst(addedPaths);
                   selectedItems.value = {
                     ...selectedItems(),
                     ...addedPaths,
@@ -132,10 +123,7 @@ class MainSidebar extends StatelessWidget {
                 tooltip: 'Drop files here to open other tools',
                 onDragPerform: (paths) => handleAction(() {
                   final addedPaths = paths;
-                  items.value = {
-                    ...items(),
-                    ...addedPaths,
-                  };
+                  items.value = itemsWithNewestFirst(addedPaths);
                   selectedItems.value = {
                     ...selectedItems(),
                     ...addedPaths,
