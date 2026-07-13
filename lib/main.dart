@@ -1,6 +1,4 @@
-import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:auto_updater/auto_updater.dart';
 import 'package:flutter/material.dart';
@@ -8,8 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:libcaesium_dart/libcaesium_dart.dart';
 import 'package:macos_ui/macos_ui.dart';
-import 'package:screen_retriever/screen_retriever.dart';
 import 'package:shakepin/app/main_drop_app.dart';
+import 'package:shakepin/shelf/shelf_bootstrap.dart';
 import 'package:shakepin/state.dart';
 import 'package:shakepin/utils/cli.dart';
 import 'package:shakepin/utils/drop_channel.dart';
@@ -27,14 +25,13 @@ void main() async {
   await DropdownChannel.instance.initialize();
 
   prefs = await SharedPreferences.getInstance();
-  await cli.init();
-  
-  // Initialize CLI tool availability service
-  await cliToolAvailability.initialize();
-  
-  // Initialize settings service for native-Flutter communication
+
   if (Platform.isMacOS) {
+    // Host engine: settings / tray / updater only. CLI probes belong on shelf engines.
     await SettingsService.initialize();
+  } else {
+    await cli.init();
+    await cliToolAvailability.initialize();
   }
 
   if (Platform.isWindows) {
@@ -60,10 +57,9 @@ void main() async {
   }
 
   if (Platform.isMacOS) {
-    // Setup auto updater
     autoUpdater
       ..setFeedURL('https://skpn-dl.damywise.com/skpn-appcast.xml')
-      ..addListener(_UpdaterListener()) // Add listener
+      ..addListener(_UpdaterListener())
       ..checkForUpdates(inBackground: true)
       ..setScheduledCheckInterval(86400);
 
@@ -71,6 +67,10 @@ void main() async {
       Uint8List.view(
           (await rootBundle.load('assets/images/tray_icon.png')).buffer),
     );
+
+    // Host engine stays hidden; shelves are separate Flutter engines.
+    runApp(const HostApp());
+    return;
   }
 
   dropChannel.setFrame(
@@ -83,6 +83,21 @@ void main() async {
   );
 
   runApp(const MainApp());
+}
+
+/// Secondary Flutter Engine entry for a collection shelf.
+///
+/// Must live in the same Dart library as [main]: macOS FlutterEngine.run
+/// only resolves entrypoints from the root library (no libraryURI API).
+@pragma('vm:entry-point')
+void shelfMain(List<String> args) async {
+  // macOS registers a few view-dependent plugins on the next native main-loop
+  // turn. Let that registration settle before ShelfRootApp builds MacosApp,
+  // which may access super_native_extensions during initialization.
+  await Future<void>.delayed(const Duration(milliseconds: 50));
+  final shelfId = args.isNotEmpty ? args[0] : 'unknown';
+  final source = args.length > 1 ? args[1] : 'hotkey';
+  await shelfBootstrap(shelfId: shelfId, source: source);
 }
 
 class _UpdaterListener extends UpdaterListener {
@@ -112,13 +127,22 @@ class _UpdaterListener extends UpdaterListener {
   }
 
   @override
-  void onUpdaterUpdateDownloaded(item) {
-    // Handle download complete
-  }
+  void onUpdaterUpdateDownloaded(item) {}
 
   @override
-  void onUpdaterBeforeQuitForUpdate(item) {
-    // Handle before quit
+  void onUpdaterBeforeQuitForUpdate(item) {}
+}
+
+/// Minimal host UI for macOS — no collection shelf.
+class HostApp extends StatelessWidget {
+  const HostApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MacosApp(
+      debugShowCheckedModeBanner: false,
+      home: SizedBox.shrink(),
+    );
   }
 }
 
@@ -136,11 +160,6 @@ class _MainAppState extends State<MainApp> {
       windowManager.setOpacity(0);
     }
     super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   @override

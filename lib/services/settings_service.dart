@@ -62,6 +62,9 @@ class SettingsService {
       final result = await _channel.invokeMethod('getSetting', key);
       print('[SETTINGS] getSetting result for $key: $result');
       return result as T?;
+    } on MissingPluginException catch (e) {
+      print('[SETTINGS] getSetting missing plugin for $key: $e');
+      return null;
     } on PlatformException catch (e) {
       print('[SETTINGS] Failed to get setting $key: ${e.message}');
       return null;
@@ -73,6 +76,8 @@ class SettingsService {
     try {
       await _channel.invokeMethod('setSetting', {'key': key, 'value': value});
       print('[SETTINGS] setSetting native call completed');
+    } on MissingPluginException catch (e) {
+      print('[SETTINGS] setSetting missing plugin for $key: $e');
     } on PlatformException catch (e) {
       print('[SETTINGS] Failed to set setting $key: ${e.message}');
     }
@@ -84,6 +89,9 @@ class SettingsService {
       final result = await _channel.invokeMethod('getAllSettings');
       print('[SETTINGS] getAllSettings result: $result');
       return Map<String, dynamic>.from(result as Map);
+    } on MissingPluginException catch (e) {
+      print('[SETTINGS] getAllSettings missing plugin: $e');
+      return null;
     } on PlatformException catch (e) {
       print('[SETTINGS] Failed to get all settings: ${e.message}');
       return null;

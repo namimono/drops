@@ -23,6 +23,8 @@
 /* Begin PBXBuildFile section */
 		05DFF4A0404AE35D6590558D /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6873C351CB05813AE298C5CA /* Pods_Runner.framework */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
+		A10000112CA6000100TEST01 /* ShelfLifecycleStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000122CA6000100TEST01 /* ShelfLifecycleStoreTests.swift */; };
+		A10000132CA6000100TEST02 /* ShelfModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022CA6000100SHELF01 /* ShelfModels.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
 		33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC10F02044A3C60003C045 /* AppDelegate.swift */; };
 		33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F22044A3C60003C045 /* Assets.xcassets */; };
@@ -34,6 +36,14 @@
 		DBCFDC2C2CA5382C00AC3C7F /* DropTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBCFDC2B2CA5382C00AC3C7F /* DropTarget.swift */; };
 		E1A2B3C42CA5382C00AC3C7F /* QuickLookPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A2B3C32CA5382C00AC3C7F /* QuickLookPreview.swift */; };
 		E1A2B3C62CA5382C00AC3C7F /* GlobalHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A2B3C52CA5382C00AC3C7F /* GlobalHotkeyManager.swift */; };
+		A10000012CA6000100SHELF01 /* ShelfModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000022CA6000100SHELF01 /* ShelfModels.swift */; };
+		A10000032CA6000100SHELF02 /* ShelfManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000042CA6000100SHELF02 /* ShelfManager.swift */; };
+		A10000052CA6000100SHELF03 /* ShelfWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000062CA6000100SHELF03 /* ShelfWindow.swift */; };
+		A10000072CA6000100SHELF04 /* WindowRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000082CA6000100SHELF04 /* WindowRuntime.swift */; };
+		A10000092CA6000100SHELF05 /* WindowHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000A2CA6000100SHELF05 /* WindowHelpers.swift */; };
+		A100000B2CA6000100SHELF06 /* GlobalInputCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000C2CA6000100SHELF06 /* GlobalInputCoordinator.swift */; };
+		A100000D2CA6000100SHELF07 /* AppHostController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000E2CA6000100SHELF07 /* AppHostController.swift */; };
+		A100000F2CA6000100SHELF08 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000102CA6000100SHELF08 /* MenuBarController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +84,7 @@
 		1EDA481BEE3FB51B75DDDB37 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D7294CF71000263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
+		A10000122CA6000100TEST01 /* ShelfLifecycleStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfLifecycleStoreTests.swift; sourceTree = "<group>"; };
 		333000ED22D3DE5D00554162 /* Warnings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Warnings.xcconfig; sourceTree = "<group>"; };
 		335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GeneratedPluginRegistrant.swift; sourceTree = "<group>"; };
 		33CC10ED2044A3C60003C045 /* ShakePin.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShakePin.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -104,6 +115,14 @@
 		DBCFDC2B2CA5382C00AC3C7F /* DropTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropTarget.swift; sourceTree = "<group>"; };
 		E1A2B3C32CA5382C00AC3C7F /* QuickLookPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickLookPreview.swift; sourceTree = "<group>"; };
 		E1A2B3C52CA5382C00AC3C7F /* GlobalHotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyManager.swift; sourceTree = "<group>"; };
+		A10000022CA6000100SHELF01 /* ShelfModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfModels.swift; sourceTree = "<group>"; };
+		A10000042CA6000100SHELF02 /* ShelfManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfManager.swift; sourceTree = "<group>"; };
+		A10000062CA6000100SHELF03 /* ShelfWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfWindow.swift; sourceTree = "<group>"; };
+		A10000082CA6000100SHELF04 /* WindowRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowRuntime.swift; sourceTree = "<group>"; };
+		A100000A2CA6000100SHELF05 /* WindowHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowHelpers.swift; sourceTree = "<group>"; };
+		A100000C2CA6000100SHELF06 /* GlobalInputCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalInputCoordinator.swift; sourceTree = "<group>"; };
+		A100000E2CA6000100SHELF07 /* AppHostController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppHostController.swift; sourceTree = "<group>"; };
+		A10000102CA6000100SHELF08 /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
 		DBCFDC2D2CA545C600AC3C7F /* RunnerDebug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RunnerDebug.entitlements; sourceTree = "<group>"; };
 		E00436E76452E00CBDED128E /* Pods-RunnerTests.release-oss.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release-oss.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release-oss.xcconfig"; sourceTree = "<group>"; };
 		FAE5E9F093F3265BA036DEC1 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
@@ -135,6 +154,7 @@
 			isa = PBXGroup;
 			children = (
 				331C80D7294CF71000263BE5 /* RunnerTests.swift */,
+				A10000122CA6000100TEST01 /* ShelfLifecycleStoreTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -194,6 +214,42 @@
 			path = Flutter;
 			sourceTree = "<group>";
 		};
+		A10000202CA6000100GRP001 /* Shelf */ = {
+			isa = PBXGroup;
+			children = (
+				A10000022CA6000100SHELF01 /* ShelfModels.swift */,
+				A10000042CA6000100SHELF02 /* ShelfManager.swift */,
+				A10000062CA6000100SHELF03 /* ShelfWindow.swift */,
+			);
+			path = Shelf;
+			sourceTree = "<group>";
+		};
+		A10000212CA6000100GRP002 /* WindowRuntime */ = {
+			isa = PBXGroup;
+			children = (
+				A10000082CA6000100SHELF04 /* WindowRuntime.swift */,
+				A100000A2CA6000100SHELF05 /* WindowHelpers.swift */,
+			);
+			path = WindowRuntime;
+			sourceTree = "<group>";
+		};
+		A10000222CA6000100GRP003 /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				A100000C2CA6000100SHELF06 /* GlobalInputCoordinator.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
+		A10000232CA6000100GRP004 /* AppHost */ = {
+			isa = PBXGroup;
+			children = (
+				A100000E2CA6000100SHELF07 /* AppHostController.swift */,
+				A10000102CA6000100SHELF08 /* MenuBarController.swift */,
+			);
+			path = AppHost;
+			sourceTree = "<group>";
+		};
 		33FAB671232836740065AC1E /* Runner */ = {
 			isa = PBXGroup;
 			children = (
@@ -211,6 +267,10 @@
 				DBCFDC2B2CA5382C00AC3C7F /* DropTarget.swift */,
 				E1A2B3C32CA5382C00AC3C7F /* QuickLookPreview.swift */,
 				E1A2B3C52CA5382C00AC3C7F /* GlobalHotkeyManager.swift */,
+				A10000202CA6000100GRP001 /* Shelf */,
+				A10000212CA6000100GRP002 /* WindowRuntime */,
+				A10000222CA6000100GRP003 /* Input */,
+				A10000232CA6000100GRP004 /* AppHost */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -470,6 +530,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */,
+				A10000112CA6000100TEST01 /* ShelfLifecycleStoreTests.swift in Sources */,
+				A10000132CA6000100TEST02 /* ShelfModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -484,6 +546,14 @@
 				DBCFDC2C2CA5382C00AC3C7F /* DropTarget.swift in Sources */,
 				E1A2B3C42CA5382C00AC3C7F /* QuickLookPreview.swift in Sources */,
 				E1A2B3C62CA5382C00AC3C7F /* GlobalHotkeyManager.swift in Sources */,
+				A10000012CA6000100SHELF01 /* ShelfModels.swift in Sources */,
+				A10000032CA6000100SHELF02 /* ShelfManager.swift in Sources */,
+				A10000052CA6000100SHELF03 /* ShelfWindow.swift in Sources */,
+				A10000072CA6000100SHELF04 /* WindowRuntime.swift in Sources */,
+				A10000092CA6000100SHELF05 /* WindowHelpers.swift in Sources */,
+				A100000B2CA6000100SHELF06 /* GlobalInputCoordinator.swift in Sources */,
+				A100000D2CA6000100SHELF07 /* AppHostController.swift in Sources */,
+				A100000F2CA6000100SHELF08 /* MenuBarController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -526,7 +596,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = click.shakepin.macos.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/shakepin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/shakepin";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShakePin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShakePin";
 			};
 			name = Debug;
 		};
@@ -541,7 +611,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = click.shakepin.macos.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/shakepin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/shakepin";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShakePin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShakePin";
 			};
 			name = Release;
 		};
@@ -556,7 +626,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = click.shakepin.macos.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/shakepin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/shakepin";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShakePin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShakePin";
 			};
 			name = Profile;
 		};
@@ -908,7 +978,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = click.shakepin.macos.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/shakepin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/shakepin";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShakePin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShakePin";
 			};
 			name = "Debug-oss";
 		};
@@ -1006,7 +1076,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = click.shakepin.macos.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/shakepin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/shakepin";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShakePin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShakePin";
 			};
 			name = "Release-oss";
 		};
@@ -1104,7 +1174,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = click.shakepin.macos.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/shakepin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/shakepin";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShakePin.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShakePin";
 			};
 			name = "Profile-oss";
 		};

@@ -941,10 +941,80 @@ struct DebugButton: View {
 
 class SettingsBridge {
   static let shared = SettingsBridge()
-  private var channel: FlutterMethodChannel?
+  /// Host + every shelf engine registers its settings channel here.
+  private var channels: [ObjectIdentifier: FlutterMethodChannel] = [:]
 
+  func registerChannel(_ channel: FlutterMethodChannel) {
+    channels[ObjectIdentifier(channel)] = channel
+  }
+
+  func unregisterChannel(_ channel: FlutterMethodChannel) {
+    channels.removeValue(forKey: ObjectIdentifier(channel))
+  }
+
+  /// Backward-compatible alias used by the host window.
   func setChannel(_ channel: FlutterMethodChannel) {
-    self.channel = channel
+    registerChannel(channel)
+  }
+
+  /// Shared Flutter → native handler for host and shelf engines.
+  func handleMethodCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    switch call.method {
+    case "showSettings":
+      AppHostController.shared.showSettingsWindow()
+      result(nil)
+    case "getSetting":
+      if let key = call.arguments as? String {
+        result(getSetting(key: key))
+      } else {
+        result(
+          FlutterError(
+            code: "INVALID_ARGUMENT", message: "Key must be a string", details: nil))
+      }
+    case "setSetting":
+      if let args = call.arguments as? [String: Any],
+        let key = args["key"] as? String,
+        let value = args["value"]
+      {
+        setSetting(key: key, value: value)
+        AppHostController.shared.handleSettingChange(key: key, value: value)
+        // Notify other engines so their SettingsService streams stay in sync.
+        broadcast(
+          method: "settingChanged",
+          arguments: ["key": key, "value": value],
+          excluding: nil)
+        result(nil)
+      } else {
+        result(
+          FlutterError(
+            code: "INVALID_ARGUMENT", message: "Invalid arguments for setSetting", details: nil))
+      }
+    case "getAllSettings":
+      result([
+        "launchAtLogin": getSetting(key: "launchAtLogin") ?? false,
+        "showMenuBarIcon": getSetting(key: "showMenuBarIcon") ?? true,
+        "theme": getSetting(key: "theme") ?? "System",
+        "enableAnalytics": getSetting(key: "enableAnalytics") ?? true,
+        "enableBetaFeatures": getSetting(key: "enableBetaFeatures") ?? false,
+      ])
+    case "settingChanged":
+      if let args = call.arguments as? [String: Any],
+        let key = args["key"] as? String,
+        let value = args["value"]
+      {
+        AppHostController.shared.handleSettingChange(key: key, value: value)
+      }
+      result(nil)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  private func broadcast(method: String, arguments: Any?, excluding: FlutterMethodChannel?) {
+    for channel in channels.values {
+      if let excluding, channel === excluding { continue }
+      channel.invokeMethod(method, arguments: arguments)
+    }
   }
 
   func notifySettingChanged(key: String, value: Any) {
@@ -954,19 +1024,8 @@ class SettingsBridge {
     self.setSetting(key: key, value: value)
     NSLog("[SETTINGS] SettingsBridge.notifySettingChanged persisted - key: %@, value: %@", key, String(describing: value))
 
-    // Find the MainFlutterWindow instance
-    if let mainWindow = NSApp.windows.first(where: { $0 is MainFlutterWindow }) as? MainFlutterWindow {
-      NSLog("[SETTINGS] Found MainFlutterWindow, calling handleSettingChangeFromBridge")
-      mainWindow.handleSettingChangeFromBridge(key: key, value: value)
-
-      // Also notify Flutter side through the main window's flutter controller
-      // Use the correct settings channel name so Dart receives the notification
-      NSLog("[SETTINGS] Found FlutterViewController, invoking settingChanged method on click.shakepin.macos/settings channel")
-      let channel = FlutterMethodChannel(name: "click.shakepin.macos/settings", binaryMessenger: mainWindow.flutterViewController.engine.binaryMessenger)
-      channel.invokeMethod("settingChanged", arguments: ["key": key, "value": value])
-    } else {
-      NSLog("[SETTINGS] Could not find MainFlutterWindow")
-    }
+    AppHostController.shared.handleSettingChange(key: key, value: value)
+    broadcast(method: "settingChanged", arguments: ["key": key, "value": value], excluding: nil)
   }
 
   /// Ask Flutter to open the installation guide for a given CLI tool.
@@ -987,13 +1046,18 @@ class SettingsBridge {
     } else if normalized == "ytdlp" || normalized == "yt_dlp" {
       normalized = "yt-dlp"
     }
-    // Find MainFlutterWindow to access a Flutter binary messenger
+    // Prefer host engine for openInstall (shelf may not have SettingsService handler wired for UI).
     if let mainWindow = NSApp.windows.first(where: { $0 is MainFlutterWindow }) as? MainFlutterWindow {
-      let channel = FlutterMethodChannel(name: "click.shakepin.macos/settings", binaryMessenger: mainWindow.flutterViewController.engine.binaryMessenger)
+      let channel = FlutterMethodChannel(
+        name: "click.shakepin.macos/settings",
+        binaryMessenger: mainWindow.flutterViewController.engine.binaryMessenger)
       channel.invokeMethod("openInstall", arguments: normalized)
       NSLog("[SETTINGS] openInstallationGuide invoked Flutter method 'openInstall' with arg: %@", normalized)
+    } else if let any = channels.values.first {
+      any.invokeMethod("openInstall", arguments: normalized)
+      NSLog("[SETTINGS] openInstallationGuide via registered channel, arg: %@", normalized)
     } else {
-      NSLog("[SETTINGS] Could not find MainFlutterWindow for openInstallationGuide")
+      NSLog("[SETTINGS] Could not find a Flutter engine for openInstallationGuide")
     }
   }
 

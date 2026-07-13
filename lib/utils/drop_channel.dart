@@ -76,14 +76,23 @@ class DropChannel {
 
         case 'dragEnter':
           final args = call.arguments;
-          listeners
-              .firstWhere((element) => element.label == args[0])
-              .onDragEnter(Offset(args[1] as double, args[2] as double));
+          final label = args[0];
+          for (final listener in listeners) {
+            if (listener.label == label) {
+              listener.onDragEnter(
+                  Offset(args[1] as double, args[2] as double));
+              break;
+            }
+          }
 
         case 'dragExited':
-          listeners
-              .firstWhere((element) => element.label == call.arguments)
-              .onDragExited();
+          final label = call.arguments;
+          for (final listener in listeners) {
+            if (listener.label == label) {
+              listener.onDragExited();
+              break;
+            }
+          }
 
         case 'dragConclude':
           for (var listener in listeners) {
@@ -92,9 +101,13 @@ class DropChannel {
 
         case 'dragPerform':
           final args = call.arguments;
-          listeners
-              .firstWhere((element) => element.label == args[0])
-              .onDragPerform(List<String>.from(args[1]));
+          final label = args[0];
+          for (final listener in listeners) {
+            if (listener.label == label) {
+              listener.onDragPerform(List<String>.from(args[1]));
+              break;
+            }
+          }
 
         case 'pastePerform':
           // Native Cmd+V / Edit → Paste: same shelf update as a drop.
@@ -106,9 +119,14 @@ class DropChannel {
 
         case 'dragUpdated':
           final args = call.arguments;
-          listeners
-              .firstWhere((element) => element.label == args[0])
-              .onDraggingUpdated(Offset(args[1] as double, args[2] as double));
+          final label = args[0];
+          for (final listener in listeners) {
+            if (listener.label == label) {
+              listener.onDraggingUpdated(
+                  Offset(args[1] as double, args[2] as double));
+              break;
+            }
+          }
 
         case 'cliOutput':
           // logger.log('CLI output: ${call.arguments}');
@@ -183,6 +201,27 @@ class DropChannel {
       throw FlutterError('Error during cleanup: ${e.message}');
     } catch (e) {
       throw FlutterError('Unexpected error during cleanup: $e');
+    }
+  }
+
+  Future<void> shelfReady(String shelfId) async {
+    if (!Platform.isMacOS) return;
+    try {
+      await _channel.invokeMethod('shelfReady', shelfId);
+    } on PlatformException catch (e) {
+      logger.log('shelfReady failed: ${e.message}');
+    }
+  }
+
+  Future<void> closeSelf() async {
+    if (!Platform.isMacOS) {
+      await hide();
+      return;
+    }
+    try {
+      await _channel.invokeMethod('closeSelf');
+    } on PlatformException catch (e) {
+      logger.log('closeSelf failed: ${e.message}');
     }
   }
 
@@ -365,6 +404,16 @@ class DropChannel {
     await _channel.invokeMethod('setVisible', visible);
   }
 
+  /// Show/hide without calling NSApp.activate — required for shake shelves
+  /// so Finder keeps drag-source focus.
+  Future<void> setVisibleWithoutActivating(bool visible) async {
+    if (Platform.isWindows) {
+      await setVisible(visible);
+      return;
+    }
+    await _channel.invokeMethod('setVisibleWithoutActivating', visible);
+  }
+
   Future<void> orderFront() async {
     if (Platform.isWindows) {
       await windowManager.focus();
@@ -524,6 +573,11 @@ class DropChannel {
         'arguments': arguments,
       });
 
+      if (result is! Map) {
+        throw FlutterError(
+            'Unexpected error starting process: native returned null/invalid result');
+      }
+
       return ProcessResult(
         0, // pid (not available from native side)
         int.parse(result['exitCode'].toString()),
@@ -554,7 +608,8 @@ class DropChannel {
       }
 
       // Existing macOS implementation
-      return await _channel.invokeMethod('cancelProcess');
+      final result = await _channel.invokeMethod('cancelProcess');
+      return result == true;
     } catch (e) {
       logger.log('Error canceling process: $e');
       return false;

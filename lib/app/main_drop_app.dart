@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:shakepin/app/about_app.dart';
 import 'package:shakepin/app/crop_app.dart';
@@ -8,6 +10,7 @@ import 'package:shakepin/app/main_drop/main_sidebar.dart';
 import 'package:shakepin/app/sections/minify_section/minify_section.dart';
 import 'package:shakepin/app/sections/misc_section/misc_section.dart';
 import 'package:shakepin/app/setup_app.dart';
+import 'package:shakepin/shelf/shelf_context.dart';
 import 'package:shakepin/utils/drop_channel.dart';
 import 'package:shakepin/utils/logger.dart';
 import 'package:shakepin/utils/utils.dart';
@@ -27,6 +30,9 @@ class MainDropApp extends StatefulWidget {
 
 class _MainDropAppState extends State<MainDropApp> with DragDropListener {
   var isShakeDetected = false;
+
+  bool get _isMacShelf =>
+      Platform.isMacOS && ShelfContext.instance.isShelfEngine;
 
   bool get _showSidebar => switch (appMode()) {
         AppMode.pin || AppMode.panel => false,
@@ -53,24 +59,29 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
 
   void itemListener() {
     logger.log('Items changed: ${items().length} items');
+    if (_isMacShelf) {
+      // macOS multi-shelf: empty shelves stay until user closes.
+      return;
+    }
     if (items().isNotEmpty) {
       keepEmptyShelfVisible = false;
       return;
     }
-    // Empty after user cleared items: hide. Keep visible if shelf was just invoked.
     if (keepEmptyShelfVisible) {
       logger.log('Items empty but shelf invoked empty — keeping visible');
       return;
     }
     logger.log('Items empty, resetting frame and hiding');
-    // Do not call handleDefaultMode here: it starts a competing 200×200
-    // window animation while resetFrameAndHide is shrinking to 200×48.
     appMode.value = AppMode.pin;
     resetFrameAndHide();
   }
 
   @override
   void shakeDetected(Offset position) async {
+    // macOS: native GlobalInputCoordinator creates shelves.
+    if (_isMacShelf || Platform.isMacOS) {
+      return;
+    }
     logger.log('Shake detected at position: $position');
     if (isShakeDetected) return;
     isShakeDetected = true;
@@ -80,6 +91,9 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
 
   @override
   void shelfInvoked(Offset position) async {
+    if (_isMacShelf || Platform.isMacOS) {
+      return;
+    }
     logger.log('Global shortcut invoked shelf at position: $position');
     await _invokeShelfAt(position);
     super.shelfInvoked(position);
@@ -89,7 +103,6 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
     cancelPendingWindowHide();
     keepEmptyShelfVisible = items().isEmpty;
 
-    // Dropover-style: always show the pin content box on invoke.
     if (appMode() != AppMode.pin) {
       await handleModeChanged(AppMode.pin, force: true);
     }
@@ -108,43 +121,25 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
 
   @override
   void onDragConclude() async {
-    // logger.log('Drag concluded');
     isShakeDetected = false;
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      logger.log('Post-frame callback: checking items');
-      if (items().isEmpty && !keepEmptyShelfVisible) {
-        logger.log('No items, resetting frame');
-        resetFrameAndHide();
-      }
-    });
+    if (!_isMacShelf) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        logger.log('Post-frame callback: checking items');
+        if (items().isEmpty && !keepEmptyShelfVisible) {
+          logger.log('No items, resetting frame');
+          resetFrameAndHide();
+        }
+      });
+    }
 
-    // Forces addPostFrameCallback to run
     setState(() {});
     super.onDragConclude();
   }
 
-  void _handleShowTooltip(String tooltip) {
-    // logger.log('Showing tooltip: $tooltip');
+  void _handleShowTooltip(String tooltip) {}
 
-    // setState(() {
-    //   _isShowingTooltip = true;
-    // });
-    // // dropChannel.showPopover(tooltip, edge: PopoverEdge.right);
-  }
-
-  void _handleHideTooltip() {
-    // logger.log('Hiding tooltip');
-    // _isShowingTooltip = false;
-    // Future.delayed(const Duration(milliseconds: 700), () {
-    //   if (!_isShowingTooltip) {
-    //     logger.log('Tooltip still not showing, hiding popover');
-    //     // dropChannel.hidePopover();
-    //   } else {
-    //     logger.log('Tooltip is showing again, not hiding popover');
-    //   }
-    // });
-  }
+  void _handleHideTooltip() {}
 
   @override
   Widget build(BuildContext context) {
@@ -159,8 +154,6 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
           children: [
             Offstage(
               offstage: isAboutApp() || isSetupApp(),
-              // Removed nested SingleChildScrollView wrappers to avoid giving descendants unbounded constraints.
-              // Use a bounded SizedBox with MediaQuery sizes and a MouseRegion to preserve hover behavior.
               child: SizedBox(
                 width: MediaQuery.sizeOf(context).width,
                 height: MediaQuery.sizeOf(context).height,
@@ -183,8 +176,6 @@ class _MainDropAppState extends State<MainDropApp> with DragDropListener {
                             AppMode.pin || AppMode.panel => SizedBox(
                                 width: contentWidth,
                                 height: MediaQuery.sizeOf(context).height,
-                                // Edge-to-edge: padding here looked like a thick gray border
-                                // against the native visual-effect backdrop.
                                 child: dropSection,
                               ),
                             AppMode.minify => SizedBox(

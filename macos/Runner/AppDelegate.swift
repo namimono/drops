@@ -24,9 +24,7 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   @objc func openSettings() {
-    if let window = NSApp.windows.first(where: { $0 is MainFlutterWindow }) as? MainFlutterWindow {
-      window.showSettingsWindow()
-    }
+    AppHostController.shared.showSettingsWindow()
   }
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true

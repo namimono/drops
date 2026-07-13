@@ -134,14 +134,13 @@ class CliToolAvailabilityService extends ChangeNotifier {
         '7z',
       ];
 
-      print('[CLI_AVAIL] Checking ${toolsToCheck.length} tools in parallel...');
+      print('[CLI_AVAIL] Checking ${toolsToCheck.length} tools sequentially...');
 
-      // Check all tools in parallel for speed
-      // Use eagerError: false so one failure doesn't stop all checks
-      final results = await Future.wait(
-        toolsToCheck.map((tool) => _checkToolAvailability(tool)),
-        eagerError: false,
-      );
+      // Native ProcessHandler allows only one process per engine — check serially.
+      final results = <bool>[];
+      for (final tool in toolsToCheck) {
+        results.add(await _checkToolAvailability(tool));
+      }
 
       print('[CLI_AVAIL] Check results: $results');
 

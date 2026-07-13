@@ -70,8 +70,8 @@ late final SharedPreferences prefs;
 
 final appMode = ValueNotifier<AppMode>(AppMode.pin);
 
-/// When true, an empty pin shelf stays visible (e.g. after shake invoke).
-/// Cleared when items are added, drag ends empty, or the user dismisses.
+/// When true (Windows single-window path), an empty pin shelf stays visible
+/// after invoke. macOS multi-shelf uses ShelfLifecycle instead.
 bool keepEmptyShelfVisible = false;
 
 enum AppMode {

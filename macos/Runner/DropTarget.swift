@@ -7,6 +7,12 @@ class DropTarget: NSView {
     let label: String
     private let channel: FlutterMethodChannel
 
+    /// When set, called with materialized paths after a successful drop.
+    var onDropAccepted: (([String]) -> Void)?
+
+    /// When true, skip channel `dragPerform` (caller delivers via onDropAccepted).
+    var deliversViaCallbackOnly = false
+
     init(frame: NSRect, label: String, channel: FlutterMethodChannel) {
         self.label = label
         self.channel = channel
@@ -37,7 +43,10 @@ class DropTarget: NSView {
         let paths = Self.materializePaths(from: sender.draggingPasteboard)
 
         if !paths.isEmpty {
-            channel.invokeMethod("dragPerform", arguments: [label, paths])
+            onDropAccepted?(paths)
+            if !deliversViaCallbackOnly {
+                channel.invokeMethod("dragPerform", arguments: [label, paths])
+            }
             return true
         }
 
@@ -45,7 +54,9 @@ class DropTarget: NSView {
     }
 
     override func concludeDragOperation(_ sender: NSDraggingInfo?) {
-        channel.invokeMethod("dragConclude", arguments: nil)
+        if !deliversViaCallbackOnly {
+            channel.invokeMethod("dragConclude", arguments: nil)
+        }
     }
 
     // MARK: - Pasteboard materialization

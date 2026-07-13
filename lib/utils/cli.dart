@@ -37,8 +37,10 @@ final cli = Cli._();
 
 class Cli {
   static bool _autoDetectionCompleted = false;
+  static Future<void>? _autoDetectionFuture;
   
   Cli._() {
+    // Kick off detection but do not race concurrent callers — they await [init].
     init();
   }
 
@@ -53,11 +55,11 @@ class Cli {
   final _videoUtils = _CliVideoUtils();
 
   Future<void> init() async {
-    // Auto-detect CLI tools on startup (only once)
-    if (!_autoDetectionCompleted) {
-      await _autoDetectCliTools();
+    if (_autoDetectionCompleted) return;
+    _autoDetectionFuture ??= _autoDetectCliTools().whenComplete(() {
       _autoDetectionCompleted = true;
-    }
+    });
+    await _autoDetectionFuture;
   }
 
   /// Auto-detect CLI tool paths and store them in settings

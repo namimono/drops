@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/gestures.dart';
@@ -464,9 +465,10 @@ class _DropSectionState extends State<DropSection> with DragDropListener {
       _itemKeys.clear();
     });
     _cancelMergeDrag();
-    // Clearing items synchronously invokes MainDropApp.itemListener, which is
-    // the single owner of the window hide sequence.
     items.clear();
+    if (Platform.isMacOS) {
+      dropChannel.closeSelf();
+    }
   }
 
   bool _isItemBeingDragged(String filePath) {

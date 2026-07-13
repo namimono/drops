@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
@@ -381,6 +382,10 @@ class _AboutAppState extends State<AboutApp> {
   Future<void> _handleCloseButtonPress() async {
     isAboutApp.value = false;
     appMode.value = AppMode.pin;
-    resetFrameAndHide();
+    if (Platform.isMacOS) {
+      await handleModeChanged(AppMode.pin, force: true);
+    } else {
+      resetFrameAndHide();
+    }
   }
 }

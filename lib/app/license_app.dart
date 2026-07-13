@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
@@ -553,7 +554,11 @@ class _LicenseAppState extends State<LicenseApp> {
   void _handleClose() {
     isLicenseApp.value = false;
     appMode.value = AppMode.pin;
-    resetFrameAndHide();
+    if (Platform.isMacOS) {
+      handleModeChanged(AppMode.pin, force: true);
+    } else {
+      resetFrameAndHide();
+    }
   }
 }
 
