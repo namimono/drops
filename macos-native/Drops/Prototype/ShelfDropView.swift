@@ -13,6 +13,7 @@ final class ShelfDropView: NSView, NSDraggingSource {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.cornerRadius = 12
+        layer?.cornerCurve = .continuous
         layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.55).cgColor
         registerForDraggedTypes([.fileURL])
         configureTable()
@@ -84,28 +85,14 @@ final class ShelfDropView: NSView, NSDraggingSource {
         needsDisplay = true
     }
 
-    // MARK: - Drag source
+    // MARK: - Drag source (NSTableView row drag + fallback)
 
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
         [.copy, .move]
     }
 
     func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
-        let label: String
-        if operation.contains(.move) {
-            label = "move"
-            if let urls = session.draggingPasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] {
-                fileURLs.removeAll { urls.contains($0) }
-                reload()
-            }
-        } else if operation.contains(.copy) {
-            label = "copy"
-        } else if operation == [] {
-            label = "cancel"
-        } else {
-            label = "other(\(operation.rawValue))"
-        }
-        NSLog("[Stage0][DragOut] operation=%@ remaining=%d", label, fileURLs.count)
+        handleDragOutEnded(session: session, operation: operation)
     }
 
     // MARK: - Private
@@ -121,8 +108,9 @@ final class ShelfDropView: NSView, NSDraggingSource {
         listView.rowHeight = 24
         listView.backgroundColor = .clear
         listView.selectionHighlightStyle = .regular
-        listView.doubleAction = #selector(beginDragFromSelection)
-        listView.target = self
+        // Standard click-and-drag out (not double-click). Double-click open is Stage 3.
+        listView.setDraggingSourceOperationMask([.copy, .move], forLocal: false)
+        listView.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
 
         scrollView.documentView = listView
         scrollView.hasVerticalScroller = true
@@ -150,18 +138,22 @@ final class ShelfDropView: NSView, NSDraggingSource {
         onItemsChanged?(fileURLs.count)
     }
 
-    @objc private func beginDragFromSelection() {
-        let indexes = listView.selectedRowIndexes
-        guard !indexes.isEmpty else { return }
-        let urls = indexes.compactMap { fileURLs.indices.contains($0) ? fileURLs[$0] : nil }
-        guard !urls.isEmpty else { return }
-
-        let draggingItems = urls.map { url -> NSDraggingItem in
-            let item = NSDraggingItem(pasteboardWriter: url as NSURL)
-            item.setDraggingFrame(NSRect(x: 0, y: 0, width: 64, height: 64), contents: NSImage(named: NSImage.folderName))
-            return item
+    private func handleDragOutEnded(session: NSDraggingSession, operation: NSDragOperation) {
+        let label: String
+        if operation.contains(.move) {
+            label = "move"
+            if let urls = session.draggingPasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] {
+                fileURLs.removeAll { urls.contains($0) }
+                reload()
+            }
+        } else if operation.contains(.copy) {
+            label = "copy"
+        } else if operation == [] {
+            label = "cancel"
+        } else {
+            label = "other(\(operation.rawValue))"
         }
-        beginDraggingSession(with: draggingItems, event: NSApp.currentEvent ?? NSEvent(), source: self)
+        NSLog("[Stage0][DragOut] operation=%@ remaining=%d", label, fileURLs.count)
     }
 }
 
@@ -183,5 +175,20 @@ extension ShelfDropView: NSTableViewDataSource, NSTableViewDelegate {
         }
         label.stringValue = fileURLs[row].lastPathComponent
         return label
+    }
+
+    /// Enables click-and-hold drag from a row (Finder-style), without requiring double-click.
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
+        guard fileURLs.indices.contains(row) else { return nil }
+        return fileURLs[row] as NSURL
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        draggingSession session: NSDraggingSession,
+        endedAt screenPoint: NSPoint,
+        operation: NSDragOperation
+    ) {
+        handleDragOutEnded(session: session, operation: operation)
     }
 }

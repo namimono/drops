@@ -4,7 +4,7 @@
 > 制定日期：2026-07-13<br>
 > 更新日期：2026-07-14<br>
 > 需求基线：[Drops-PRD.md](../Drops-PRD.md)<br>
-> 方案状态：产品范围已确认；阶段 0 构建与临时文件单测通过，但存在阻断窗口验收的 P0 启动缺陷<br>
+> 方案状态：产品范围已确认；阶段 0 已完成；阶段 1 代码已实现，待手工验收（S1-01/07/08/10）<br>
 > 开发进度：[development-progress.md](development-progress.md)<br>
 > 审查问题：[stage-0-review-issues.md](stage-0-review-issues.md)
 
@@ -456,5 +456,5 @@ Drops 仅支持 macOS：
 2. ~~把 PRD 第 9 章改写为可执行验收清单~~ → 见范围清单第 3 节
 3. ~~创建 `macos-native/Drops.xcodeproj`、测试 Target 和产品 Bundle ID 配置~~ → 已完成
 4. 建立 `en`、`zh-Hans` String Catalog 和安全术语表（阶段 1/3）
-5. 修复 [阶段 0 审查问题](stage-0-review-issues.md)，再验证浮窗、拖入、拖出、焦点、多窗口和性能；受管临时文件清理已通过单测
-6. 技术验证通过后进入内容架领域模型和 MVP 实现 → [stage-1-shelf-domain-and-window.md](stage-1-shelf-domain-and-window.md)
+5. ~~修复阶段 0 审查问题并完成浮窗/拖放/性能验证~~ → 见 [stage-0-validation.md](stage-0-validation.md)
+6. 进入内容架领域模型和 MVP 实现 → [stage-1-shelf-domain-and-window.md](stage-1-shelf-domain-and-window.md)

@@ -36,7 +36,7 @@ final class Stage0PerformanceMetrics: @unchecked Sendable {
         [Stage0][Perf] Baseline summary
         - Persistent create→first-frame: \(persistent)
         - Transient create→drag-ready: \(transient)
-        Measurement method: CFAbsoluteTimeGetCurrent around show(). Future stages reuse the same markers.
+        Measurement method: start before show(); end on CATransaction completion after displayIfNeeded (persistent=firstFrameVisible, transient=dragReady with fileURL registration).
         """
     }
 

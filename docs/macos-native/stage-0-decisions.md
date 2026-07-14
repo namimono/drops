@@ -21,16 +21,15 @@
 | D-12 | 签名策略 | 阶段 0：Automatic + 本地开发签名；无 Team 也可 Debug 构建 | 发布签名与公证不阻塞阶段 0 退出 |
 | D-13 | Sandbox | 阶段 0 原型 **关闭 App Sandbox** | 降低拖放验证噪声；阶段 5 发布前再启用并补齐书签/权限 |
 | D-14 | Flutter | 原生 Target **零依赖** Flutter Engine / MethodChannel | 运行时与构建均不链接 Flutter |
-| D-15 | 性能预算 | 主动创建→首帧 P95 < 300 ms；摇动/临时→可拖放 P95 < 200 ms | 预算保留；当前包住 `show()` 的实现不能代表首帧或 drag-ready，测量事件点待 REV-S0-003 修复 |
+| D-15 | 性能预算 | 主动创建→首帧 P95 < 300 ms；摇动/临时→可拖放 P95 < 200 ms | 结束点为 CATransaction completion 后的 firstFrameVisible / dragReady；M-06 手工报告 p95=78.7ms，通过 |
 
-## 实现偏差（2026-07-14 审查）
+## 实现偏差（已关闭）
 
-- D-06 / D-07 尚未在运行时验证：REV-S0-001 导致 `AppDelegate` 未安装、窗口未创建；REV-S0-002 导致 persistent panel 也带 `.nonactivatingPanel`。
-- D-08 只有原型代码，Finder 与第三方应用的 copy/move/cancel 尚未完成手工验证。
-- D-15 的预算不变，但现有采样点无验收效力，修复后需重新采样。
-- 详细问题和关闭条件见 [stage-0-review-issues.md](stage-0-review-issues.md)。
+- D-06 / D-07 / D-08：M-01～M-05 手工通过（直角边框与按住拖出已二次修复后复验）。
+- D-15：测量点对齐且 M-06 通过。
+- 审查关闭记录见 [stage-0-review-issues.md](stage-0-review-issues.md)。
 
 ## 对阶段 1 的约束
 
-- 阶段 1 在 REV-S0-001～REV-S0-004 关闭、阶段 0 退出评审通过后，沿用本表的系统版本、Bundle ID、工程布局及修正后的窗口行为契约，不再重新选型。
+- 阶段 1 沿用本表的系统版本、Bundle ID、工程布局及窗口行为契约，不再重新选型。
 - 领域模型与 `ShelfWindowController` 正式实现时，可替换 Stage 0 原型类，但行为契约保持一致。

@@ -7,14 +7,24 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		102DE263D8A035F403A25257 /* ShelfLifecycleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA8447ABD571D3F3DCA17B9 /* ShelfLifecycleStore.swift */; };
 		2FFFF9587BF4F54661EBFA3B /* ManagedTemporaryFileStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AABD01C14008A081EE101F5 /* ManagedTemporaryFileStoreTests.swift */; };
-		593007ACB1D237534F5D3FBA /* ShelfDropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEC13104BD27C161B8019765 /* ShelfDropView.swift */; };
+		5B75223E4B40B167E0071FAC /* Stage0LaunchAndWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C8FFB9E802DD1CBD2CF7E04 /* Stage0LaunchAndWindowTests.swift */; };
 		5F48231B71DD45A479BC962C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CA80C5ADFA78672AA6CCF04F /* Assets.xcassets */; };
-		69DC20D67EC679FEA9FB4881 /* Stage0DemoController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E13CF16935F22138B92CE35 /* Stage0DemoController.swift */; };
+		71A745CF2F0E97C537E05C41 /* ShelfLifecycleStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9AAC63DC924850759172D5 /* ShelfLifecycleStoreTests.swift */; };
 		7DFA61A0EE256BCFF185B6A5 /* ManagedTemporaryFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57CC0D09C964326F28D6EBEB /* ManagedTemporaryFileStore.swift */; };
+		878383B74542882102DE53CE /* ShelfModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBAFCC9E0F84B0233D2D08A0 /* ShelfModels.swift */; };
+		8B4A06615B29ABCE201FDC24 /* GlobalHotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8892D6688BACA167988FDB5A /* GlobalHotkeyManager.swift */; };
+		8D35385A121A80114D069759 /* ShelfContentViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF396CBCFC13C4CF0488C1E /* ShelfContentViewController.swift */; };
 		91F87DB0CAB7899310034F66 /* TemporaryFileModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DFAB3C08F154C4749B8463 /* TemporaryFileModels.swift */; };
+		9749EB06AE9819E06BE628C1 /* ShelfWindowGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66130DA56AE961F3285CB5BD /* ShelfWindowGeometry.swift */; };
 		98740A1CFE26E6ADA537DDE6 /* Stage0PerformanceMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD34C4E27850EE80A273C0D /* Stage0PerformanceMetrics.swift */; };
-		DD88EDFA714137EC5A4C41AF /* ShelfPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A12459DDE312AD2FA01585 /* ShelfPanelController.swift */; };
+		AA95DFEA91145098E98FC4C9 /* ApplicationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5606CFEFFE6215121D8E41F9 /* ApplicationController.swift */; };
+		AC5B907ABCF6E300C67084BF /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E285FE12AC61945F6865E4C /* main.swift */; };
+		CF095910EB65F2383009B37F /* ShelfWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6AE1CEF78F724BBB8ED6536 /* ShelfWindowController.swift */; };
+		D816826AFD3F80B696AA6138 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509E76EBA46A366FBFDFFE85 /* MenuBarController.swift */; };
+		E6256C72BA556D2F39A14AAC /* ShelfManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1953F4E94F67228E55B75AC2 /* ShelfManager.swift */; };
+		E6B545D0D3E53EDBE7F93A95 /* ShelfManagerWindowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DE82B2EEB36621E9BF72B31 /* ShelfManagerWindowTests.swift */; };
 		F7DA836E6494B0F035D9E75D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA05B89CABD7459A42B8FFB /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
@@ -30,14 +40,24 @@
 
 /* Begin PBXFileReference section */
 		0BA05B89CABD7459A42B8FFB /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		0E13CF16935F22138B92CE35 /* Stage0DemoController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stage0DemoController.swift; sourceTree = "<group>"; };
-		42A12459DDE312AD2FA01585 /* ShelfPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfPanelController.swift; sourceTree = "<group>"; };
+		0C8FFB9E802DD1CBD2CF7E04 /* Stage0LaunchAndWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stage0LaunchAndWindowTests.swift; sourceTree = "<group>"; };
+		1953F4E94F67228E55B75AC2 /* ShelfManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfManager.swift; sourceTree = "<group>"; };
+		1DE82B2EEB36621E9BF72B31 /* ShelfManagerWindowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfManagerWindowTests.swift; sourceTree = "<group>"; };
 		4AABD01C14008A081EE101F5 /* ManagedTemporaryFileStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedTemporaryFileStoreTests.swift; sourceTree = "<group>"; };
+		4E285FE12AC61945F6865E4C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		509E76EBA46A366FBFDFFE85 /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
+		5606CFEFFE6215121D8E41F9 /* ApplicationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationController.swift; sourceTree = "<group>"; };
 		57CC0D09C964326F28D6EBEB /* ManagedTemporaryFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedTemporaryFileStore.swift; sourceTree = "<group>"; };
+		5CF396CBCFC13C4CF0488C1E /* ShelfContentViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfContentViewController.swift; sourceTree = "<group>"; };
+		66130DA56AE961F3285CB5BD /* ShelfWindowGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfWindowGeometry.swift; sourceTree = "<group>"; };
 		6C6E88844203E05FEEA09CAF /* DropsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DropsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8892D6688BACA167988FDB5A /* GlobalHotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyManager.swift; sourceTree = "<group>"; };
+		8EA8447ABD571D3F3DCA17B9 /* ShelfLifecycleStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfLifecycleStore.swift; sourceTree = "<group>"; };
+		B6AE1CEF78F724BBB8ED6536 /* ShelfWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfWindowController.swift; sourceTree = "<group>"; };
 		C1DFAB3C08F154C4749B8463 /* TemporaryFileModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporaryFileModels.swift; sourceTree = "<group>"; };
 		CA80C5ADFA78672AA6CCF04F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		DEC13104BD27C161B8019765 /* ShelfDropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfDropView.swift; sourceTree = "<group>"; };
+		CBAFCC9E0F84B0233D2D08A0 /* ShelfModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfModels.swift; sourceTree = "<group>"; };
+		EC9AAC63DC924850759172D5 /* ShelfLifecycleStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfLifecycleStoreTests.swift; sourceTree = "<group>"; };
 		F7898C12A97EB961E425BA92 /* Drops.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Drops.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FCD34C4E27850EE80A273C0D /* Stage0PerformanceMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stage0PerformanceMetrics.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -60,23 +80,27 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		1641117C590D73CDB35D1136 /* ShelfUI */ = {
+			isa = PBXGroup;
+			children = (
+				5CF396CBCFC13C4CF0488C1E /* ShelfContentViewController.swift */,
+				B6AE1CEF78F724BBB8ED6536 /* ShelfWindowController.swift */,
+				66130DA56AE961F3285CB5BD /* ShelfWindowGeometry.swift */,
+			);
+			path = ShelfUI;
+			sourceTree = "<group>";
+		};
 		56605484F84A63B7CB69C66E /* Application */ = {
 			isa = PBXGroup;
 			children = (
 				0BA05B89CABD7459A42B8FFB /* AppDelegate.swift */,
-				0E13CF16935F22138B92CE35 /* Stage0DemoController.swift */,
+				5606CFEFFE6215121D8E41F9 /* ApplicationController.swift */,
+				4E285FE12AC61945F6865E4C /* main.swift */,
+				509E76EBA46A366FBFDFFE85 /* MenuBarController.swift */,
+				1953F4E94F67228E55B75AC2 /* ShelfManager.swift */,
 				FCD34C4E27850EE80A273C0D /* Stage0PerformanceMetrics.swift */,
 			);
 			path = Application;
-			sourceTree = "<group>";
-		};
-		6D15E83265A9B16C4006C659 /* Prototype */ = {
-			isa = PBXGroup;
-			children = (
-				DEC13104BD27C161B8019765 /* ShelfDropView.swift */,
-				42A12459DDE312AD2FA01585 /* ShelfPanelController.swift */,
-			);
-			path = Prototype;
 			sourceTree = "<group>";
 		};
 		858B23315C89CFEA29C0620F /* Services */ = {
@@ -92,9 +116,10 @@
 			children = (
 				56605484F84A63B7CB69C66E /* Application */,
 				A579A81370D8EFB56539AD86 /* Domain */,
-				6D15E83265A9B16C4006C659 /* Prototype */,
+				ADE9DC6CC1A34F5918C04863 /* Input */,
 				03F89315BA10BDC0647D543F /* Resources */,
 				858B23315C89CFEA29C0620F /* Services */,
+				1641117C590D73CDB35D1136 /* ShelfUI */,
 			);
 			path = Drops;
 			sourceTree = "<group>";
@@ -102,6 +127,8 @@
 		A579A81370D8EFB56539AD86 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
+				8EA8447ABD571D3F3DCA17B9 /* ShelfLifecycleStore.swift */,
+				CBAFCC9E0F84B0233D2D08A0 /* ShelfModels.swift */,
 				C1DFAB3C08F154C4749B8463 /* TemporaryFileModels.swift */,
 			);
 			path = Domain;
@@ -116,10 +143,21 @@
 			);
 			sourceTree = "<group>";
 		};
+		ADE9DC6CC1A34F5918C04863 /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				8892D6688BACA167988FDB5A /* GlobalHotkeyManager.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
 		C654F1AA874720450FC3D943 /* DropsTests */ = {
 			isa = PBXGroup;
 			children = (
 				4AABD01C14008A081EE101F5 /* ManagedTemporaryFileStoreTests.swift */,
+				EC9AAC63DC924850759172D5 /* ShelfLifecycleStoreTests.swift */,
+				1DE82B2EEB36621E9BF72B31 /* ShelfManagerWindowTests.swift */,
+				0C8FFB9E802DD1CBD2CF7E04 /* Stage0LaunchAndWindowTests.swift */,
 			);
 			path = DropsTests;
 			sourceTree = "<group>";
@@ -219,6 +257,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				2FFFF9587BF4F54661EBFA3B /* ManagedTemporaryFileStoreTests.swift in Sources */,
+				71A745CF2F0E97C537E05C41 /* ShelfLifecycleStoreTests.swift in Sources */,
+				E6B545D0D3E53EDBE7F93A95 /* ShelfManagerWindowTests.swift in Sources */,
+				5B75223E4B40B167E0071FAC /* Stage0LaunchAndWindowTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -227,12 +268,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				F7DA836E6494B0F035D9E75D /* AppDelegate.swift in Sources */,
+				AA95DFEA91145098E98FC4C9 /* ApplicationController.swift in Sources */,
+				8B4A06615B29ABCE201FDC24 /* GlobalHotkeyManager.swift in Sources */,
 				7DFA61A0EE256BCFF185B6A5 /* ManagedTemporaryFileStore.swift in Sources */,
-				593007ACB1D237534F5D3FBA /* ShelfDropView.swift in Sources */,
-				DD88EDFA714137EC5A4C41AF /* ShelfPanelController.swift in Sources */,
-				69DC20D67EC679FEA9FB4881 /* Stage0DemoController.swift in Sources */,
+				D816826AFD3F80B696AA6138 /* MenuBarController.swift in Sources */,
+				8D35385A121A80114D069759 /* ShelfContentViewController.swift in Sources */,
+				102DE263D8A035F403A25257 /* ShelfLifecycleStore.swift in Sources */,
+				E6256C72BA556D2F39A14AAC /* ShelfManager.swift in Sources */,
+				878383B74542882102DE53CE /* ShelfModels.swift in Sources */,
+				CF095910EB65F2383009B37F /* ShelfWindowController.swift in Sources */,
+				9749EB06AE9819E06BE628C1 /* ShelfWindowGeometry.swift in Sources */,
 				98740A1CFE26E6ADA537DDE6 /* Stage0PerformanceMetrics.swift in Sources */,
 				91F87DB0CAB7899310034F66 /* TemporaryFileModels.swift in Sources */,
+				AC5B907ABCF6E300C67084BF /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

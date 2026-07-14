@@ -1,8 +1,22 @@
 import AppKit
+import QuartzCore
 
 enum ShelfPanelKind {
     case persistent
     case transient
+}
+
+enum ShelfShowMilestone: Equatable {
+    /// Persistent shelf: first frame has been committed for display.
+    case firstFrameVisible
+    /// Transient shelf: panel is on-screen and registered to accept file URL drops.
+    case dragReady
+}
+
+/// Borderless panels default to `canBecomeKey == false`; override so persistent shelves stay interactive.
+private final class ShelfPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
 }
 
 /// Borderless floating shelf panel used to validate Stage 0 window and focus assumptions.
@@ -11,16 +25,29 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
     let kind: ShelfPanelKind
     var onClose: (() -> Void)?
 
-    private let panel: NSPanel
+    private let panel: ShelfPanel
     private let contentView: ShelfDropView
     private let titleLabel = NSTextField(labelWithString: "")
+    private let cornerRadius: CGFloat = 16
+
+    /// Exposed for Stage 0 automated checks (style mask / focus contract).
+    var styleMask: NSWindow.StyleMask { panel.styleMask }
+    var canBecomeKeyWindow: Bool { panel.canBecomeKey }
+    var isVisible: Bool { panel.isVisible }
+    var isDragDestinationReady: Bool {
+        contentView.window != nil && contentView.registeredDraggedTypes.contains(.fileURL)
+    }
 
     init(kind: ShelfPanelKind) {
         self.kind = kind
         self.contentView = ShelfDropView(frame: NSRect(x: 0, y: 0, width: 280, height: 220))
 
-        let style: NSWindow.StyleMask = [.borderless, .nonactivatingPanel, .resizable]
-        panel = NSPanel(
+        // No `.resizable`: resize chrome on borderless panels often draws a square outline (M-01).
+        var style: NSWindow.StyleMask = [.borderless]
+        if kind == .transient {
+            style.insert(.nonactivatingPanel)
+        }
+        panel = ShelfPanel(
             contentRect: NSRect(x: 0, y: 0, width: 280, height: 220),
             styleMask: style,
             backing: .buffered,
@@ -33,14 +60,16 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
         panel.delegate = self
     }
 
-    func show() {
+    /// Shows the panel. Invokes `onMilestone` when the Stage 0 latency end-point is reached.
+    func show(onMilestone: ((ShelfShowMilestone) -> Void)? = nil) {
         panel.orderFrontRegardless()
         if kind == .persistent {
-            // Persistent shelves may become key for keyboard interaction.
             panel.makeKey()
             NSApp.activate(ignoringOtherApps: true)
         }
         // Transient shelves intentionally avoid activation so the drag source keeps focus.
+
+        notifyWhenReady(onMilestone)
     }
 
     func close() {
@@ -61,6 +90,38 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
         onClose?()
     }
 
+    func windowDidResize(_ notification: Notification) {
+        refreshRoundedWindowChrome()
+    }
+
+    private func notifyWhenReady(_ onMilestone: ((ShelfShowMilestone) -> Void)?) {
+        guard let onMilestone else { return }
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            guard let self else { return }
+            self.panel.layoutIfNeeded()
+            self.panel.displayIfNeeded()
+            self.refreshRoundedWindowChrome()
+
+            switch self.kind {
+            case .persistent:
+                onMilestone(.firstFrameVisible)
+            case .transient:
+                if self.isDragDestinationReady {
+                    onMilestone(.dragReady)
+                } else {
+                    DispatchQueue.main.async {
+                        onMilestone(.dragReady)
+                    }
+                }
+            }
+        }
+        panel.layoutIfNeeded()
+        panel.displayIfNeeded()
+        CATransaction.commit()
+    }
+
     private func configurePanel() {
         panel.isFloatingPanel = true
         panel.level = .floating
@@ -74,19 +135,21 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.becomesKeyOnlyIfNeeded = kind == .transient
         panel.animationBehavior = .utilityWindow
-
-        if kind == .transient {
-            panel.styleMask.insert(.nonactivatingPanel)
-        }
     }
 
     private func configureContent() {
-        let container = NSVisualEffectView(frame: panel.contentView?.bounds ?? .zero)
+        // Clear root so the rectangular window surface does not paint behind rounded content.
+        let root = NSView(frame: panel.frame)
+        root.wantsLayer = true
+        root.layer?.backgroundColor = NSColor.clear.cgColor
+
+        let container = NSVisualEffectView(frame: root.bounds)
         container.material = .hudWindow
         container.blendingMode = .behindWindow
         container.state = .active
         container.wantsLayer = true
-        container.layer?.cornerRadius = 16
+        container.layer?.cornerRadius = cornerRadius
+        container.layer?.cornerCurve = .continuous
         container.layer?.masksToBounds = true
         container.autoresizingMask = [.width, .height]
 
@@ -100,7 +163,7 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
         closeButton.font = .systemFont(ofSize: 11, weight: .medium)
         closeButton.translatesAutoresizingMaskIntoConstraints = false
 
-        let subtitle = NSTextField(wrappingLabelWithString: "从 Finder 拖文件到下方 · 选中后双击拖出 · 菜单栏托盘图标可开更多窗口")
+        let subtitle = NSTextField(wrappingLabelWithString: "从 Finder 拖文件到下方 · 选中后按住拖出 · 菜单栏托盘图标可开更多窗口")
         subtitle.font = .systemFont(ofSize: 11)
         subtitle.textColor = .secondaryLabelColor
         subtitle.translatesAutoresizingMaskIntoConstraints = false
@@ -114,6 +177,7 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
         container.addSubview(closeButton)
         container.addSubview(subtitle)
         container.addSubview(contentView)
+        root.addSubview(container)
 
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
@@ -133,7 +197,21 @@ final class ShelfPanelController: NSObject, NSWindowDelegate {
             contentView.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -10),
         ])
 
-        panel.contentView = container
+        panel.contentView = root
+        refreshRoundedWindowChrome()
+    }
+
+    /// Keep window shadow / opaque shape matched to the rounded visual-effect surface (S0-04 / M-01).
+    private func refreshRoundedWindowChrome() {
+        guard let root = panel.contentView else { return }
+        root.wantsLayer = true
+        root.layer?.cornerRadius = cornerRadius
+        root.layer?.cornerCurve = .continuous
+        root.layer?.masksToBounds = false
+        root.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.invalidateShadow()
     }
 
     @objc private func closeFromButton() {

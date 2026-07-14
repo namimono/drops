@@ -24,6 +24,7 @@ targets:
         excludes:
           - Resources/Info.plist
           - Support/**
+          - Prototype/**
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: click.shakepin.macos

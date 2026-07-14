@@ -4,13 +4,14 @@
 > 对应方案：[README.md](./README.md)  
 > 产品依据：[Drops-PRD.md](../Drops-PRD.md)  
 > 阶段 0 实施：[stage-0-requirements-and-validation.md](./stage-0-requirements-and-validation.md)  
+> 阶段 1 实施：[stage-1-shelf-domain-and-window.md](./stage-1-shelf-domain-and-window.md)  
 > 范围清单：[stage-0-scope.md](./stage-0-scope.md)  
 > 决策记录：[stage-0-decisions.md](./stage-0-decisions.md)  
 > 风险结论：[stage-0-risks.md](./stage-0-risks.md)  
 > 验证记录：[stage-0-validation.md](./stage-0-validation.md)  
 > 审查问题：[stage-0-review-issues.md](./stage-0-review-issues.md)  
 > 基线分支：当前工作区（原生工程位于 `macos-native/`）  
-> 平台 / 范围：仅 macOS 13.0+；阶段 0 需求冻结与关键能力验证
+> 平台 / 范围：仅 macOS 13.0+；阶段 1 内容架领域与窗口骨架
 
 ---
 
@@ -18,118 +19,105 @@
 
 | 阶段 | 方案内容 | 状态 | 说明 |
 |---|---|---|---|
-| 阶段 0 | 需求冻结与技术验证 | **部分完成** | 构建与临时文件单测通过；P0 启动缺陷导致窗口、拖放和性能验收不可执行 |
-| 阶段 1 | 内容架领域与窗口骨架 | **未开始** | 等待阶段 0 P0/P1 问题修复及退出评审 |
+| 阶段 0 | 需求冻结与技术验证 | **已完成** | S0-01～S0-10 通过；可进入阶段 1 |
+| 阶段 1 | 内容架领域与窗口骨架 | **代码已实现，待验证** | 领域/多窗/入口已落地；自动化 35/35；手工 S1-01/07/08/10 待做 |
 | 阶段 2 | 拖放与剪贴板主链路 | **未开始** | — |
 | 阶段 3 | 原生交互完善 | **未开始** | — |
 | 阶段 4 | 图片与视频压缩 | **未开始** | — |
 | 阶段 5 | 发布准备 | **未开始** | — |
 
-**综合判断：阶段 0 的工程骨架、范围冻结、受管临时文件安全删除与构建/单测证据已齐备；但运行时 `NSApplication.shared.delegate` 为 `nil`，启动逻辑未执行，状态栏和浮窗均未创建。该 P0 缺陷以及 persistent panel 类型、性能测量点问题修复前，S0-04～S0-07、S0-09、S0-10 不能通过，也不能进入阶段 1。**
+**综合判断：阶段 1 主链路代码与生命周期自动化已齐备（35/35），尚未完成快捷键/菜单近鼠标创建、圆角截图、多屏边缘与 20 窗稳定性的手工验收；通过后即可退出阶段 1。**
 
 ## 2. 已实现能力
 
-- PRD 第 8 章边界已写成可执行范围清单与非目标表（含 Windows / 归档 / 裁剪 / 辅助工具排除）。
-- 独立原生工程 `macos-native/Drops.xcodeproj` 可 Debug / Release 构建，测试 Target 可运行，二进制无 Flutter 链接。
-- Stage 0 已包含菜单栏、主动/临时/多窗口内容架的原型代码，但当前启动入口未安装 `AppDelegate`，运行时不可达。
-- `ShelfPanelController` 已包含无边框 `NSPanel`、VisualEffect 圆角和拖放代码；persistent/transient 当前均带 `.nonactivatingPanel`，焦点策略待修复。
-- `ShelfDropView` 已包含 Finder 文件拖入和 copy/move/cancel 日志代码，待启动缺陷修复后完成跨应用验证。
-- `ManagedTemporaryFileStore` 使用 Application Support 受管目录；拒绝根外路径与符号链接逃逸；覆盖保留期、引用保护、自动/手动清理规则的单元测试 **8/8 通过**。
-- 性能预算保留为主动首帧 P95 < 300 ms、临时可拖放 P95 < 200 ms；当前 `show()` 前后采样不能代表首帧或 drag-ready，测量实现待修复。
+- 内容架领域：`Shelf` / 生命周期 / 展示态 / 选择集合 / 模拟内容项。
+- `ShelfLifecycleStore`：主动持久、摇动临时、接收晋升、未接收关闭、上限 20、关闭后忽略迟到事件。
+- `ShelfManager` + `ShelfWindowController`：多窗独立创建/关闭，空态/收起/展开骨架与尺寸切换。
+- 菜单栏 **New Shelf** 与默认全局快捷键 **⌘⌥Space** 创建持久内容架；达上限时 `NSSound.beep()`。
+- 菜单提供临时架 Demo（模拟拖拽会话），可用 **Simulate Drop** 验证晋升。
+- Stage 0 窗口焦点契约已迁入正式 `ShelfWindowController`；Prototype 已从 Target 排除。
 
 ## 3. 已落地的架构改动
 
 | 模块 | 路径 | 职责 |
 |---|---|---|
-| XcodeGen 工程定义 | `macos-native/project.yml` | Bundle ID、部署版本、Debug/Release、测试 Host |
-| 应用入口 | `macos-native/Drops/Application/` | 菜单栏 Demo、性能采样 |
-| 窗口/拖放原型 | `macos-native/Drops/Prototype/` | 无边框面板、拖入拖出 |
-| 临时文件领域 | `macos-native/Drops/Domain/TemporaryFileModels.swift` | 记录、保留策略、错误类型 |
-| 受管临时存储 | `macos-native/Drops/Services/ManagedTemporaryFileStore.swift` | 创建、清理、路径安全校验 |
-| 单元测试 | `macos-native/DropsTests/` | 删除边界与保留规则 |
+| 领域模型 | `macos-native/Drops/Domain/ShelfModels.swift` | 打开来源、生命周期、展示、内容项 |
+| 生命周期库 | `macos-native/Drops/Domain/ShelfLifecycleStore.swift` | 纯领域、可单测的创建/晋升/关闭规则 |
+| 管理器 | `macos-native/Drops/Application/ShelfManager.swift` | 领域 + 窗口集合、迟到事件门禁 |
+| 窗口 | `macos-native/Drops/ShelfUI/ShelfWindowController.swift` | 无边框浮窗、焦点、圆角、尺寸 |
+| 内容骨架 | `macos-native/Drops/ShelfUI/ShelfContentViewController.swift` | 空/收起/展开占位 UI |
+| 几何 | `macos-native/Drops/ShelfUI/ShelfWindowGeometry.swift` | 近鼠标定位与可见区夹紧 |
+| 应用宿主 | `macos-native/Drops/Application/ApplicationController.swift` | 启动、菜单与快捷键接线 |
+| 菜单栏 | `macos-native/Drops/Application/MenuBarController.swift` | New Shelf / Demo / Close All |
+| 快捷键 | `macos-native/Drops/Input/GlobalHotkeyManager.swift` | Carbon ⌘⌥Space |
 
 ## 4. 已知偏差 / 限制
 
-1. **App Sandbox 关闭**：阶段 0 为降低拖放验证噪声关闭 Sandbox；发布前（阶段 5）需启用并补齐权限/书签方案。
-2. **启动链路阻断**：无 storyboard/nib 时未显式设置并强持有 `AppDelegate`；进程存活但 `NSApp.delegate == nil`、`NSApp.windows.count == 0`。
-3. **窗口类型偏差**：persistent panel 也包含 `.nonactivatingPanel`，主动窗焦点能力与设计不符。
-4. **手工交互未闭环**：M-01～M-06 受启动缺陷阻断，尚无窗口、跨应用焦点与拖放演示证据。
-5. **性能测量无效**：当前采样只覆盖 `show()` 同步耗时，需改到真实首帧/drag-ready 事件点后重新采样。
-6. **测试覆盖不足**：原生 8 个测试只覆盖受管临时文件，没有启动和窗口回归保护。
-7. **非日用产品**：Stage 0 原型无完整 UI、剪贴板物化、压缩或设置页。
+1. **App Sandbox 关闭**：沿用阶段 0；阶段 5 再启用。
+2. **真实拖放未接入**：临时架晋升/关闭靠模拟事件；真实 Finder 拖入属阶段 2。
+3. **String Catalog 未建**：骨架文案仍为英文硬编码；阶段 3 再统一本地化。
+4. **Prototype 保留未编译**：`Drops/Prototype/` 排除出 Target，仅作历史参考。
 
 ## 5. 验证与修复记录
 
 | 类型 / 级别 | 场景或问题 | 状态 | 证据 / 修复 |
 |---|---|---|---|
-| 构建 | Debug `xcodebuild -scheme Drops -configuration Debug` | **通过** | `BUILD SUCCEEDED`（2026-07-14） |
-| 构建 | Release 同方案 | **通过** | `BUILD SUCCEEDED`（2026-07-14） |
-| 单测 | `ManagedTemporaryFileStoreTests` 8 cases | **通过** | `TEST SUCCEEDED`（2026-07-14） |
-| 依赖 | 产物 Flutter 链接检查 | **通过** | `otool -L` 无 Flutter |
-| MainActor | `AppDelegate` 属性初始化隔离错误 | **已修复** | 改为 `applicationDidFinishLaunching` 内创建 |
-| 独占访问 | `updateRetentionDays` overlapping access | **已修复** | 本地 `var record` 再写回 |
-| 代码审查 / P0 | AppDelegate 未安装，应用无窗口 | **待修复** | 运行时 `NSApp.delegate == nil`、`NSApp.windows.count == 0`；REV-S0-001 |
-| 代码审查 / P1 | persistent panel 错用 `.nonactivatingPanel` | **待修复** | `ShelfPanelController` style mask 无条件包含该标志；REV-S0-002 |
-| 代码审查 / P1 | 性能测量点不代表首帧/drag-ready | **待修复** | 仅统计 `show()` 前后同步耗时；REV-S0-003 |
-| 代码审查 / P1 | 启动和窗口自动化覆盖缺失 | **待补测试** | 现有 8 个原生测试均为临时文件领域测试；REV-S0-004 |
-| 手工 | 浮窗/焦点/拖放/多窗/性能 | **被 P0 阻断** | [stage-0-validation.md](./stage-0-validation.md) M-01–M-06 |
+| 构建 / 单测 | Debug 测试 35/35 | **通过** | `xcodebuild test -scheme Drops -destination 'platform=macOS'`（2026-07-14） |
+| 自动化 S1-02/03/04/05/06/09 | 多窗、上限、持久空架、临时晋升/关闭、展示切换、迟到事件 | **通过** | `ShelfLifecycleStoreTests` + `ShelfManagerWindowTests` |
+| 手工 S1-01 | 快捷键与菜单栏近鼠标创建 | **待验证** | 启动 App 后试 ⌘⌥Space / New Shelf |
+| 手工 S1-07 | 圆角/阴影浅色深色截图 | **待验证** | — |
+| 手工 S1-08 | 多屏与边缘定位 | **待验证** | 几何单测已覆盖夹紧公式 |
+| 手工 S1-10 | 20 空架创建/展开/收起/关闭与 CPU | **待验证** | 管理器可创建满 20；需目视与活动监视器 |
 
 ## 6. 未完成 / 待办
 
 ### P0 · 正确性或稳定性
 
-- [ ] 修复 REV-S0-001：显式安装并强持有 `AppDelegate`，确认启动后状态栏和 persistent shelf 可见。
-- [ ] 修复 REV-S0-002：仅 transient panel 使用 `.nonactivatingPanel`，persistent panel 可激活并成为 key window。
-- [ ] 完成 M-01～M-05 手工演示并写入验证记录（浅色/深色、不抢焦点、Finder 与至少一第三方拖出、多窗关闭独立）。
-- [ ] 阶段 0 退出评审确认后，再启动阶段 1 领域模型与正式 `ShelfWindowController`。
+- [ ] 完成阶段 1 手工验收：S1-01、S1-07、S1-08、S1-10，并回写验证记录。
+- [ ] 阶段 1 退出评审通过后，再启动阶段 2 真实拖放与剪贴板。
 
 ### P1 · 治理、性能或维护性
 
-- [ ] 修复 REV-S0-003：使用真实首帧可见与 drag-ready 事件点采样，再执行 M-06。
-- [ ] 补充 REV-S0-004：AppDelegate 启动、窗口类型和多窗口生命周期自动化检查。
 - [ ] 规划阶段 5 的 Sandbox / Developer ID / 公证接入点（不阻塞阶段 1）。
+- [ ] 将骨架硬编码文案迁入 String Catalog（阶段 3）。
 
 ## 7. 验收对照
 
 | 验收项 | 状态 |
 |---|---|
-| S0-01 范围冻结（含非目标） | **已实现并文档化** |
-| S0-02 最低系统 / Bundle ID / Debug-Release / 签名策略 | **已实现并文档化**（签名正式发布留阶段 5） |
-| S0-03 干净 Debug/Release + 测试 + 无 Flutter | **已验证**（本机 xcodebuild / otool） |
-| S0-04 无边框内容架无灰底泄漏 | **被 REV-S0-001 阻断**；当前无窗口 |
-| S0-05 主动可交互 / 临时不抢焦点 | **被 REV-S0-001 阻断，且 REV-S0-002 待修复** |
-| S0-06 Finder 拖入拖出 copy/move/cancel | **被 REV-S0-001 阻断**；仅有未验证原型代码 |
-| S0-07 多窗口独立关闭 | **被 REV-S0-001 阻断**；仅有未验证原型代码 |
-| S0-08 受管目录清理与符号链接逃逸防护 | **已验证**（单测 8/8） |
-| S0-09 性能基准口径 | **预算已确认，测量实现无效**；REV-S0-003 待修复 |
-| S0-10 关键风险均有结论 | **未通过**；存在 P0/P1 未解决问题 |
+| S1-01 快捷键/菜单近鼠标创建持久架 | **代码已实现，待手工验证** |
+| S1-02 多窗独立标识/状态/关闭 | **已验证（自动化）** |
+| S1-03 第 20 允许、第 21 拒绝并提示音 | **已验证（自动化 + beep 代码）** |
+| S1-04 主动空架不因失焦自动关闭 | **已验证（领域：无自动关闭路径）** |
+| S1-05 临时架等待/晋升/未接收关闭 | **已验证（模拟事件自动化）** |
+| S1-06 空/收起/展开稳定切换 | **已验证（快速切换自动化）** |
+| S1-07 圆角阴影无灰底泄漏 | **代码已迁入正式窗，待截图** |
+| S1-08 多屏/边缘保持在可见区 | **夹紧逻辑已测，待多屏手工** |
+| S1-09 关闭后迟到事件忽略 | **已验证（自动化）** |
+| S1-10 20 空架稳定性 | **代码支持，待手工性能观察** |
 
 ## 8. 建议下一迭代顺序
 
-1. 按 [stage-0-review-issues.md](./stage-0-review-issues.md) 修复 REV-S0-001 和 REV-S0-002，恢复可观察、可交互的窗口链路。
-2. 完成 M-01～M-05 手工演示；修复性能标记后完成 M-06。
-3. 补齐启动和窗口测试，更新风险及验收状态。
-4. 阶段 0 退出评审通过后，实施 [stage-1-shelf-domain-and-window.md](./stage-1-shelf-domain-and-window.md)。
-5. 将 `ManagedTemporaryFileStore` 保留为阶段 2 正式接入点，避免重复实现删除边界。
+1. 手工跑通 S1-01 / S1-07 / S1-08 / S1-10 并记入验证文档。
+2. 阶段 1 退出后实施 [stage-2-drag-drop-and-pasteboard.md](./stage-2-drag-drop-and-pasteboard.md)。
+3. 将 `ManagedTemporaryFileStore` 正式接到剪贴板物化。
 
 ## 9. 变更文件速查
 
-**阶段 0 实施产物（当前工作区）**
+**阶段 1 首轮实现**
 
-- `macos-native/`（工程、源码、测试、README、project.yml）
-- `docs/macos-native/stage-0-scope.md`
-- `docs/macos-native/stage-0-decisions.md`
-- `docs/macos-native/stage-0-risks.md`
-- `docs/macos-native/stage-0-validation.md`
-- `docs/macos-native/development-progress.md`
-
-**修改**
-
-- `docs/macos-native/stage-0-requirements-and-validation.md`（状态更新）
-- `docs/macos-native/README.md`（进度与阶段 0 产物链接）
-
-**2026-07-14 审查文档修订**
-
-- 新增 `docs/macos-native/stage-0-review-issues.md`。
-- 修正 `development-progress.md`、阶段 0 需求/决策/风险/验证文档及 `macos-native/README.md` 中过早的通过结论。
-- 本次仅修改文档，未修复 Swift 代码；所有 REV-S0-001～REV-S0-005 状态以问题清单为准。
+- `macos-native/Drops/Domain/ShelfModels.swift`
+- `macos-native/Drops/Domain/ShelfLifecycleStore.swift`
+- `macos-native/Drops/Application/ShelfManager.swift`
+- `macos-native/Drops/Application/ApplicationController.swift`
+- `macos-native/Drops/Application/MenuBarController.swift`
+- `macos-native/Drops/Application/AppDelegate.swift`
+- `macos-native/Drops/Input/GlobalHotkeyManager.swift`
+- `macos-native/Drops/ShelfUI/ShelfWindowController.swift`
+- `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`
+- `macos-native/Drops/ShelfUI/ShelfWindowGeometry.swift`
+- `macos-native/DropsTests/ShelfLifecycleStoreTests.swift`
+- `macos-native/DropsTests/ShelfManagerWindowTests.swift`
+- `macos-native/DropsTests/Stage0LaunchAndWindowTests.swift`
+- `macos-native/project.yml`（排除 `Prototype/**`）
+- 删除：`macos-native/Drops/Application/Stage0DemoController.swift`

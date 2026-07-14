@@ -1,12 +1,11 @@
 import AppKit
 
-@main
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var demoController: Stage0DemoController?
+    private var applicationController: ApplicationController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let controller = Stage0DemoController()
-        demoController = controller
+        let controller = ApplicationController()
+        applicationController = controller
         controller.start()
     }
 

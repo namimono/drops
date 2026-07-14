@@ -1,6 +1,6 @@
 # 阶段 0：需求冻结与技术验证
 
-> 状态：部分完成（构建与临时文件单测通过；P0 启动缺陷阻断窗口验收）<br>
+> 状态：已完成（S0-01～S0-10 通过；可进入阶段 1）<br>
 > 上级文档：[macOS 原生方案](README.md)<br>
 > 产品依据：[Drops PRD](../Drops-PRD.md)<br>
 > 范围清单：[stage-0-scope.md](stage-0-scope.md)<br>
