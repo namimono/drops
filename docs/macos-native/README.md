@@ -4,7 +4,9 @@
 > 制定日期：2026-07-13<br>
 > 更新日期：2026-07-14<br>
 > 需求基线：[Drops-PRD.md](../Drops-PRD.md)<br>
-> 方案状态：产品范围已确认，技术方案待评审
+> 方案状态：产品范围已确认；阶段 0 构建与临时文件单测通过，但存在阻断窗口验收的 P0 启动缺陷<br>
+> 开发进度：[development-progress.md](development-progress.md)<br>
+> 审查问题：[stage-0-review-issues.md](stage-0-review-issues.md)
 
 ## 1. 结论
 
@@ -335,7 +337,7 @@ protocol ShelfOperation: Sendable {
 
 各阶段的目标、范围、交付物和验收标准已拆分为独立实施文档。本章只保留总体顺序和阶段出口索引。
 
-| 阶段 | 核心目标 | 阶段出口 | 实施文档 |
+| 阶段 | 核心目标 | 阶段出口目标（不代表当前已通过） | 实施文档 |
 |---|---|---|---|
 | 阶段 0 | 冻结产品范围，验证决定架构成败的 macOS 系统能力 | 原生工程和关键技术验证通过，无架构阻断项 | [需求冻结与技术验证](stage-0-requirements-and-validation.md) |
 | 阶段 1 | 建立内容架领域规则和稳定的多窗口骨架 | 多个内容架可独立创建、切换状态和关闭 | [内容架领域与窗口骨架](stage-1-shelf-domain-and-window.md) |
@@ -450,9 +452,9 @@ Drops 仅支持 macOS：
 
 ## 12. 下一步
 
-1. 依据 PRD 第 8 章冻结 V1 功能清单，并在工程中明确排除已砍掉模块。
-2. 把 PRD 第 9 章改写为可执行验收清单。
-3. 创建 `macos-native/Drops.xcodeproj`、测试 Target 和产品 Bundle ID 配置。
-4. 建立 `en`、`zh-Hans` String Catalog 和安全术语表。
-5. 用最小技术样例验证浮窗、拖入、拖出、焦点、摇动唤起和受管临时文件清理。
-6. 技术验证通过后进入内容架领域模型和 MVP 实现。
+1. ~~依据 PRD 第 8 章冻结 V1 功能清单~~ → [stage-0-scope.md](stage-0-scope.md)
+2. ~~把 PRD 第 9 章改写为可执行验收清单~~ → 见范围清单第 3 节
+3. ~~创建 `macos-native/Drops.xcodeproj`、测试 Target 和产品 Bundle ID 配置~~ → 已完成
+4. 建立 `en`、`zh-Hans` String Catalog 和安全术语表（阶段 1/3）
+5. 修复 [阶段 0 审查问题](stage-0-review-issues.md)，再验证浮窗、拖入、拖出、焦点、多窗口和性能；受管临时文件清理已通过单测
+6. 技术验证通过后进入内容架领域模型和 MVP 实现 → [stage-1-shelf-domain-and-window.md](stage-1-shelf-domain-and-window.md)

@@ -1,0 +1,11 @@
+# Xcode
+Drops.xcworkspace/
+**/xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+.swiftpm/
+
+# Local signing / secrets
+*.mobileprovision
+*.p12

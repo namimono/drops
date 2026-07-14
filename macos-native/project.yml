@@ -1,0 +1,98 @@
+name: Drops
+options:
+  bundleIdPrefix: click.shakepin
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+    CLANG_ENABLE_MODULES: YES
+targets:
+  Drops:
+    type: application
+    platform: macOS
+    sources:
+      - path: Drops
+        excludes:
+          - Resources/Info.plist
+          - Support/**
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: click.shakepin.macos
+        PRODUCT_NAME: Drops
+        PRODUCT_COPYRIGHT: "Copyright © 2026 click.shakepin. All rights reserved."
+        INFOPLIST_FILE: Drops/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Drops/Support/Drops.entitlements
+        LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "@executable_path/../Frameworks"]
+        GENERATE_INFOPLIST_FILE: NO
+        COMBINE_HIDPI_IMAGES: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: []
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: ["DEBUG"]
+          ONLY_ACTIVE_ARCH: YES
+        Release:
+          SWIFT_COMPILATION_MODE: wholemodule
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+    info:
+      path: Drops/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Drops
+        CFBundleName: Drops
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.utilities
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        LSUIElement: false
+        NSPrincipalClass: NSApplication
+        NSHumanReadableCopyright: "$(PRODUCT_COPYRIGHT)"
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: Drops/Support/Drops.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.downloads.read-write: true
+    scheme:
+      testTargets:
+        - DropsTests
+  DropsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: DropsTests
+    dependencies:
+      - target: Drops
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: click.shakepin.macos.DropsTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Drops.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Drops"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  Drops:
+    build:
+      targets:
+        Drops: all
+        DropsTests: [test]
+    test:
+      targets:
+        - DropsTests
+      gatherCoverageData: false
+    run:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

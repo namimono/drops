@@ -1,8 +1,14 @@
 # 阶段 0：需求冻结与技术验证
 
-> 状态：待实施  
-> 上级文档：[macOS 原生方案](README.md)  
-> 产品依据：[Drops PRD](../Drops-PRD.md)
+> 状态：部分完成（构建与临时文件单测通过；P0 启动缺陷阻断窗口验收）<br>
+> 上级文档：[macOS 原生方案](README.md)<br>
+> 产品依据：[Drops PRD](../Drops-PRD.md)<br>
+> 范围清单：[stage-0-scope.md](stage-0-scope.md)<br>
+> 决策记录：[stage-0-decisions.md](stage-0-decisions.md)<br>
+> 风险结论：[stage-0-risks.md](stage-0-risks.md)<br>
+> 验证记录：[stage-0-validation.md](stage-0-validation.md)<br>
+> 审查问题：[stage-0-review-issues.md](stage-0-review-issues.md)<br>
+> 开发进度：[development-progress.md](development-progress.md)
 
 ## 1. 阶段定位
 
@@ -56,7 +62,7 @@
 | S0-07 | 可同时创建多个相互独立的窗口，关闭其中一个不会导致其他窗口状态丢失或进程异常。 | 多窗口演示与异常日志检查 |
 | S0-08 | 受管临时文件只能在指定目录内被清理，外部文件和通过符号链接逃逸到目录外的目标不会被删除。 | 自动化测试或验证报告 |
 | S0-09 | 主动创建到首帧可见、摇动触发到可接收拖放的性能基准已确认，后续阶段有统一测量口径。 | 性能基准记录 |
-| S0-10 | 所有关键技术风险均有“通过、接受限制或调整方案”的明确结论，不存在未处理的架构阻断项。 | 风险清单与阶段评审结论 |
+| S0-10 | 阶段 0 退出评审时，所有关键技术风险均须有“通过、接受限制或调整方案”的明确结论，且不得存在未处理的架构阻断项。 | 风险清单与阶段评审结论 |
 
 ## 6. 准入条件
 
