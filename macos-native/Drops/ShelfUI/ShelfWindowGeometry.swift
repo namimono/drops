@@ -3,7 +3,9 @@ import AppKit
 enum ShelfShowMilestone: Equatable {
     /// Persistent shelf: first frame committed for display.
     case firstFrameVisible
-    /// Transient shelf: panel on-screen and ready to accept drops (Stage 2).
+    /// Transient shelf: panel on-screen (pre-drop-registration timing aid).
+    case transientWindowVisible
+    /// Transient shelf: visible and registered as a drag destination.
     case dragReady
 }
 

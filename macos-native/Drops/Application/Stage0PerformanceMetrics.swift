@@ -35,8 +35,8 @@ final class Stage0PerformanceMetrics: @unchecked Sendable {
         return """
         [Stage0][Perf] Baseline summary
         - Persistent create→first-frame: \(persistent)
-        - Transient create→drag-ready: \(transient)
-        Measurement method: start before show(); end on CATransaction completion after displayIfNeeded (persistent=firstFrameVisible, transient=dragReady with fileURL registration).
+        - Transient create→window-visible: \(transient)
+        Measurement method: start before show(); end on CATransaction completion after displayIfNeeded (persistent=firstFrameVisible, transient=dragReady once drop types are registered).
         """
     }
 

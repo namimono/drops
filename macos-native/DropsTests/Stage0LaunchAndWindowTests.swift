@@ -35,7 +35,10 @@ final class Stage0LaunchAndWindowTests: XCTestCase {
         )
         shelf.show()
         XCTAssertTrue(shelf.isVisible)
-        XCTAssertTrue(shelf.isDragDestinationReady)
+        XCTAssertTrue(
+            shelf.isDragDestinationReady,
+            "Stage 2 registers drop types; dragReady must be true when visible"
+        )
         shelf.close()
     }
 
@@ -73,14 +76,22 @@ final class Stage0LaunchAndWindowTests: XCTestCase {
         shelf.close()
     }
 
-    func testShowReportsDragReadyMilestoneForTransient() {
+    func testShowReportsTransientWindowVisibleAndDragReadyMilestones() {
         let shelf = ShelfWindowController(shelfID: ShelfID(), openSource: .shake)
-        let expectation = expectation(description: "dragReady")
+        let visible = expectation(description: "transientWindowVisible")
+        let ready = expectation(description: "dragReady")
         shelf.show { milestone in
-            XCTAssertEqual(milestone, .dragReady)
-            expectation.fulfill()
+            switch milestone {
+            case .transientWindowVisible:
+                visible.fulfill()
+            case .dragReady:
+                ready.fulfill()
+            default:
+                break
+            }
         }
-        wait(for: [expectation], timeout: 2.0)
+        wait(for: [visible, ready], timeout: 2.0)
+        XCTAssertTrue(shelf.isVisible)
         XCTAssertTrue(shelf.isDragDestinationReady)
         shelf.close()
     }

@@ -53,31 +53,55 @@ final class ShelfLifecycleStore {
         return .success(shelf)
     }
 
-    func beginExternalDrag(dragSessionId: DragSessionID) {
+    /// Starts a drag session. Same-ID begin is idempotent. A different ID preempts the
+    /// previous session and returns any unaccepted transient shelf that must close.
+    @discardableResult
+    func beginExternalDrag(dragSessionId: DragSessionID) -> [ShelfID] {
+        if let existing = dragSession {
+            if existing.id == dragSessionId {
+                return []
+            }
+            let orphaned = unacceptedTransientIDs(for: existing)
+            dragSession = DragSessionRecord(id: dragSessionId)
+            return orphaned
+        }
         dragSession = DragSessionRecord(id: dragSessionId)
+        return []
     }
 
+    /// Promotes a transient shelf only when `dragSessionId` matches the shelf association
+    /// and the current session is still `.dragging`. Persistent shelves use content APIs instead.
     @discardableResult
     func markDropAccepted(shelfId: ShelfID, dragSessionId: DragSessionID? = nil) -> Bool {
-        _ = dragSessionId
         guard let shelf = shelves[shelfId], shelf.isActive else { return false }
+        guard shelf.lifecycle == .transient else { return false }
+        guard let dragSessionId,
+              shelf.associatedDragSessionId == dragSessionId,
+              let drag = dragSession,
+              drag.id == dragSessionId,
+              drag.state == .dragging else {
+            return false
+        }
         shelf.markAcceptedDrop()
         return true
     }
 
     /// Returns shelf ids that should close because transient + no drop.
     func endExternalDrag(dragSessionId: DragSessionID) -> [ShelfID] {
-        guard var drag = dragSession, drag.id == dragSessionId else { return [] }
-        drag.state = .finished
-        var toClose: [ShelfID] = []
-        if let shakeId = drag.shakeShelfId,
-           let shelf = shelves[shakeId],
-           shelf.lifecycle == .transient,
-           !shelf.acceptedDrop {
-            toClose.append(shakeId)
-        }
+        guard let drag = dragSession, drag.id == dragSessionId else { return [] }
+        let toClose = unacceptedTransientIDs(for: drag)
         dragSession = nil
         return toClose
+    }
+
+    private func unacceptedTransientIDs(for drag: DragSessionRecord) -> [ShelfID] {
+        guard let shakeId = drag.shakeShelfId,
+              let shelf = shelves[shakeId],
+              shelf.lifecycle == .transient,
+              !shelf.acceptedDrop else {
+            return []
+        }
+        return [shakeId]
     }
 
     @discardableResult
@@ -109,6 +133,14 @@ final class ShelfLifecycleStore {
     @discardableResult
     func simulateReceiveContent(shelfId: ShelfID, named name: String = "Item") -> Bool {
         guard let shelf = shelves[shelfId], shelf.isActive else { return false }
+        if shelf.lifecycle == .transient {
+            guard let associated = shelf.associatedDragSessionId,
+                  let drag = dragSession,
+                  drag.id == associated,
+                  drag.state == .dragging else {
+                return false
+            }
+        }
         shelf.insertSimulatedItem(named: name)
         if shelf.lifecycle == .transient {
             shelf.markAcceptedDrop()

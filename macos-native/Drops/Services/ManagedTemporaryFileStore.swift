@@ -40,11 +40,12 @@ final class ManagedTemporaryFileStore: @unchecked Sendable {
     }
 
     /// Creates a managed temporary file and returns its absolute URL plus record.
+    /// Pass `referencedBy: nil` when the caller will commit the shelf reference after a successful batch accept.
     @discardableResult
     func createTemporaryFile(
         named fileName: String,
         data: Data,
-        referencedBy shelfID: ShelfID,
+        referencedBy shelfID: ShelfID? = nil,
         now: Date = Date()
     ) throws -> (url: URL, record: TemporaryFileRecord) {
         lock.lock()
@@ -52,22 +53,37 @@ final class ManagedTemporaryFileStore: @unchecked Sendable {
 
         let id = UUID()
         let folder = rootURL.appendingPathComponent(id.uuidString, isDirectory: true)
-        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
-        let relativePath = "\(id.uuidString)/\(fileName)"
-        let fileURL = rootURL.appendingPathComponent(relativePath)
+        do {
+            try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+            let relativePath = "\(id.uuidString)/\(fileName)"
+            let fileURL = rootURL.appendingPathComponent(relativePath)
 
-        try data.write(to: fileURL, options: .atomic)
-        let record = TemporaryFileRecord(
-            id: id,
-            relativePath: relativePath,
-            createdAt: now,
-            expiresAt: now.addingTimeInterval(TimeInterval(retentionPolicy.days * 24 * 60 * 60)),
-            activeShelfReferences: [shelfID],
-            deletionState: .active
-        )
-        records[id] = record
-        try persistMetadataLocked()
-        return (fileURL, record)
+            try data.write(to: fileURL, options: .atomic)
+            var refs = Set<ShelfID>()
+            if let shelfID {
+                refs.insert(shelfID)
+            }
+            let record = TemporaryFileRecord(
+                id: id,
+                relativePath: relativePath,
+                createdAt: now,
+                expiresAt: now.addingTimeInterval(TimeInterval(retentionPolicy.days * 24 * 60 * 60)),
+                activeShelfReferences: refs,
+                deletionState: .active
+            )
+            records[id] = record
+            do {
+                try persistMetadataLocked()
+            } catch {
+                records.removeValue(forKey: id)
+                try? fileManager.removeItem(at: folder)
+                throw error
+            }
+            return (fileURL, record)
+        } catch {
+            try? fileManager.removeItem(at: folder)
+            throw error
+        }
     }
 
     func updateRetentionDays(_ days: Int, now: Date = Date()) throws {
@@ -98,6 +114,69 @@ final class ManagedTemporaryFileStore: @unchecked Sendable {
         defer { lock.unlock() }
         records[id]?.activeShelfReferences.remove(shelfID)
         try? persistMetadataLocked()
+    }
+
+    /// Removes every shelf reference. Used on launch because shelves are process-local and not restored.
+    func clearAllShelfReferences() {
+        lock.lock()
+        defer { lock.unlock() }
+        var changed = false
+        for key in records.keys {
+            guard var record = records[key], !record.activeShelfReferences.isEmpty else { continue }
+            record.activeShelfReferences.removeAll()
+            records[key] = record
+            changed = true
+        }
+        if changed {
+            try? persistMetadataLocked()
+        }
+    }
+
+    /// Deletes brand-new managed files that were never accepted into a shelf (materialize rollback).
+    func discardCreatedFiles(ids: [UUID]) {
+        guard !ids.isEmpty else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        for id in ids {
+            guard let record = records[id] else { continue }
+            let fileURL = rootURL.appendingPathComponent(record.relativePath)
+            let folder = fileURL.deletingLastPathComponent()
+            try? fileManager.removeItem(at: fileURL)
+            if let contents = try? fileManager.contentsOfDirectory(atPath: folder.path), contents.isEmpty {
+                try? fileManager.removeItem(at: folder)
+            }
+            records.removeValue(forKey: id)
+        }
+        try? persistMetadataLocked()
+    }
+
+    func absoluteURL(for record: TemporaryFileRecord) -> URL {
+        rootURL.appendingPathComponent(record.relativePath)
+    }
+
+    /// Resolves a file URL back to a managed record when the path lies under this store's root.
+    func record(forFileURL fileURL: URL) -> TemporaryFileRecord? {
+        lock.lock()
+        defer { lock.unlock() }
+        let standardized = fileURL.standardizedFileURL
+        let standardizedRoot = rootURL.standardizedFileURL
+        guard isPath(standardized.path, inside: standardizedRoot.path) else {
+            return nil
+        }
+        let relative = String(standardized.path.dropFirst(standardizedRoot.path.count))
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        return records.values.first { $0.relativePath == relative && $0.deletionState != .deleted }
+    }
+
+    func managedDraft(forFileURL fileURL: URL) -> ShelfItemDraft? {
+        guard let record = record(forFileURL: fileURL) else { return nil }
+        let url = absoluteURL(for: record)
+        return .managed(
+            url: url,
+            displayName: url.lastPathComponent,
+            kind: PasteboardMaterializer.kind(forFileName: url.lastPathComponent),
+            temporaryFileID: record.id
+        )
     }
 
     /// Automatic cleanup: only expired + unreferenced managed files.
@@ -225,6 +304,18 @@ final class ManagedTemporaryFileStore: @unchecked Sendable {
         let data = try Data(contentsOf: metadataURL)
         let decoded = try JSONDecoder().decode([TemporaryFileRecord].self, from: data)
         records = Dictionary(uniqueKeysWithValues: decoded.map { ($0.id, $0) })
+        // Shelves are not restored across launches; drop process-local references that would
+        // permanently block cleanup (REV-S2-002).
+        var changed = false
+        for key in records.keys {
+            guard var record = records[key], !record.activeShelfReferences.isEmpty else { continue }
+            record.activeShelfReferences.removeAll()
+            records[key] = record
+            changed = true
+        }
+        if changed {
+            try persistMetadataLocked()
+        }
     }
 
     private func persistMetadataLocked() throws {

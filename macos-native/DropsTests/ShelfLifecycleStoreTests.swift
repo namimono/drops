@@ -48,6 +48,69 @@ final class ShelfLifecycleStoreTests: XCTestCase {
         XCTAssertTrue(store.shelf(id: id)?.acceptedDrop == true)
     }
 
+    func testMarkDropAcceptedRejectsWrongOrNilSession() {
+        store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
+        let created = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-1"))
+        let id = created.shelf!.id
+
+        XCTAssertFalse(store.markDropAccepted(shelfId: id, dragSessionId: nil))
+        XCTAssertFalse(store.markDropAccepted(shelfId: id, dragSessionId: DragSessionID("other")))
+        XCTAssertEqual(store.shelf(id: id)?.lifecycle, .transient)
+
+        XCTAssertTrue(store.markDropAccepted(shelfId: id, dragSessionId: DragSessionID("drag-1")))
+        XCTAssertEqual(store.shelf(id: id)?.lifecycle, .persistent)
+    }
+
+    func testMarkDropAcceptedRejectsAfterSessionEnded() {
+        store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
+        let created = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-1"))
+        let id = created.shelf!.id
+        // Promote first so end does not remove the shelf; then clear session.
+        XCTAssertTrue(store.markDropAccepted(shelfId: id, dragSessionId: DragSessionID("drag-1")))
+        _ = store.endExternalDrag(dragSessionId: DragSessionID("drag-1"))
+
+        // Already persistent — promotion API must not apply again.
+        XCTAssertFalse(store.markDropAccepted(shelfId: id, dragSessionId: DragSessionID("drag-1")))
+    }
+
+    func testLateAcceptOnEndedTransientIsRejected() {
+        store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
+        let created = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-1"))
+        let id = created.shelf!.id
+        let toClose = store.endExternalDrag(dragSessionId: DragSessionID("drag-1"))
+        XCTAssertEqual(toClose, [id])
+        // Shelf still in store until caller closes it; accept must fail because session is gone.
+        XCTAssertFalse(store.markDropAccepted(shelfId: id, dragSessionId: DragSessionID("drag-1")))
+        XCTAssertEqual(store.shelf(id: id)?.lifecycle, .transient)
+    }
+
+    func testNewDragPreemptsOldSessionAndClosesOrphanTransient() {
+        store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
+        let first = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-1"))
+        let orphanID = first.shelf!.id
+
+        let preempted = store.beginExternalDrag(dragSessionId: DragSessionID("drag-2"))
+        XCTAssertEqual(preempted, [orphanID])
+        XCTAssertEqual(store.dragSession?.id, DragSessionID("drag-2"))
+
+        // Late end of the old session must be a no-op.
+        XCTAssertTrue(store.endExternalDrag(dragSessionId: DragSessionID("drag-1")).isEmpty)
+
+        let second = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-2"))
+        XCTAssertTrue(second.isSuccess)
+        let closed = store.endExternalDrag(dragSessionId: DragSessionID("drag-2"))
+        XCTAssertEqual(closed, [second.shelf!.id])
+    }
+
+    func testBeginSameDragSessionIsIdempotent() {
+        store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
+        let created = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-1"))
+        let again = store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
+        XCTAssertTrue(again.isEmpty)
+        XCTAssertEqual(store.dragSession?.shakeShelfId, created.shelf?.id)
+        XCTAssertEqual(store.activeCount, 1)
+    }
+
     func testSimulateReceivePromotesAndLeavesCollapsed() {
         store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
         let created = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-1"))
@@ -68,7 +131,7 @@ final class ShelfLifecycleStoreTests: XCTestCase {
     func testPersistentSurvivesDragEnd() {
         store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
         let created = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-1"))
-        _ = store.markDropAccepted(shelfId: created.shelf!.id)
+        _ = store.markDropAccepted(shelfId: created.shelf!.id, dragSessionId: DragSessionID("drag-1"))
         let toClose = store.endExternalDrag(dragSessionId: DragSessionID("drag-1"))
         XCTAssertTrue(toClose.isEmpty)
         XCTAssertEqual(store.shelf(id: created.shelf!.id)?.lifecycle, .persistent)
@@ -77,7 +140,7 @@ final class ShelfLifecycleStoreTests: XCTestCase {
     func testNewDragSessionCanCreateAnotherShakeShelf() {
         store.beginExternalDrag(dragSessionId: DragSessionID("drag-1"))
         let first = store.createShelf(source: .shake, dragSessionId: DragSessionID("drag-1"))
-        _ = store.markDropAccepted(shelfId: first.shelf!.id)
+        _ = store.markDropAccepted(shelfId: first.shelf!.id, dragSessionId: DragSessionID("drag-1"))
         _ = store.endExternalDrag(dragSessionId: DragSessionID("drag-1"))
 
         store.beginExternalDrag(dragSessionId: DragSessionID("drag-2"))

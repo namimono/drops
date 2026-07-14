@@ -1,9 +1,10 @@
 # 阶段 1：内容架领域与窗口骨架
 
-> 状态：代码已实现，待手工验收（S1-01 / S1-07 / S1-08 / S1-10）  
+> 状态：已完成（S1-01～S1-10 通过；REV-S1-001～005 已关闭；可进入阶段 2）<br>
 > 上级文档：[macOS 原生方案](README.md)  
 > 前置阶段：[阶段 0：需求冻结与技术验证](stage-0-requirements-and-validation.md)
 > 开发进度：[development-progress.md](development-progress.md)
+> 代码审查：[stage-1-review-issues.md](stage-1-review-issues.md)
 
 ## 1. 阶段定位
 

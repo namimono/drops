@@ -54,6 +54,59 @@ final class ShelfManagerWindowTests: XCTestCase {
         XCTAssertNotNil(shelf)
         XCTAssertTrue(shelf?.presentation == .collapsed || shelf?.presentation == .expanded)
         XCTAssertEqual(shelf?.lifecycle, .persistent)
+
+        let expected = ShelfWindowController.size(for: shelf!.presentation)
+        let frame = manager.windowFrame(shelfId: id)
+        XCTAssertNotNil(frame)
+        XCTAssertEqual(frame!.size.width, expected.width, accuracy: 0.5)
+        XCTAssertEqual(frame!.size.height, expected.height, accuracy: 0.5)
+        manager.closeAll()
+    }
+
+    func testPresentationToggleSettlesToTargetFrameWithAnimation() {
+        let manager = ShelfManager()
+        let id = manager.createShelf(source: .menu, nearMouse: false)!
+        manager.setAnimatesPresentationChanges(true, for: id)
+        XCTAssertTrue(manager.simulateReceiveContent(shelfId: id))
+        XCTAssertEqual(manager.shelf(id: id)?.presentation, .collapsed)
+
+        let collapsed = ShelfWindowController.size(for: .collapsed)
+        let collapsedReady = expectation(description: "collapsed frame after animation")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            let frame = manager.windowFrame(shelfId: id)
+            XCTAssertEqual(frame?.size.width ?? -1, collapsed.width, accuracy: 0.5)
+            XCTAssertEqual(frame?.size.height ?? -1, collapsed.height, accuracy: 0.5)
+            collapsedReady.fulfill()
+        }
+        wait(for: [collapsedReady], timeout: 1.5)
+
+        manager.toggleExpand(shelfId: id)
+        XCTAssertEqual(manager.shelf(id: id)?.presentation, .expanded)
+        let expanded = ShelfWindowController.size(for: .expanded)
+        let expandedReady = expectation(description: "expanded frame after animation")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            let frame = manager.windowFrame(shelfId: id)
+            XCTAssertEqual(frame?.size.width ?? -1, expanded.width, accuracy: 0.5)
+            XCTAssertEqual(frame?.size.height ?? -1, expanded.height, accuracy: 0.5)
+            expandedReady.fulfill()
+        }
+        wait(for: [expandedReady], timeout: 1.5)
+        manager.closeAll()
+    }
+
+    func testPreemptedDragClosesOrphanTransientWindow() {
+        let manager = ShelfManager()
+        let drag1 = DragSessionID("preempt-1")
+        manager.beginExternalDrag(dragSessionId: drag1)
+        let orphan = manager.createShelf(source: .shake, nearMouse: false)!
+
+        let drag2 = DragSessionID("preempt-2")
+        manager.beginExternalDrag(dragSessionId: drag2)
+        XCTAssertNil(manager.shelf(id: orphan))
+
+        let replacement = manager.createShelf(source: .shake, nearMouse: false)!
+        manager.endExternalDrag(dragSessionId: drag2)
+        XCTAssertNil(manager.shelf(id: replacement))
         manager.closeAll()
     }
 
@@ -74,6 +127,7 @@ final class ShelfManagerWindowTests: XCTestCase {
         XCTAssertNil(manager.shelf(id: doomed))
         manager.closeAll()
     }
+
 }
 
 final class ShelfWindowGeometryTests: XCTestCase {

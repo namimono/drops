@@ -5,6 +5,24 @@ import QuartzCore
 private final class ShelfPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    /// Keep domain-driven empty/collapsed/expanded sizes; do not inflate to content fittingSize.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        var constrained = super.constrainFrameRect(frameRect, to: screen)
+        constrained.size = frameRect.size
+        if let screen {
+            let visible = screen.visibleFrame
+            constrained.origin.x = min(
+                max(constrained.origin.x, visible.minX),
+                max(visible.minX, visible.maxX - constrained.size.width)
+            )
+            constrained.origin.y = min(
+                max(constrained.origin.y, visible.minY),
+                max(visible.minY, visible.maxY - constrained.size.height)
+            )
+        }
+        return constrained
+    }
 }
 
 /// Formal shelf window. Migrates Stage 0 chrome / focus contracts into `NSWindowController`.
@@ -16,6 +34,10 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     var onClose: (() -> Void)?
     var onToggleExpand: (() -> Void)?
     var onCollapse: (() -> Void)?
+    var onPasteboardDrop: ((NSPasteboard) -> Bool)?
+    var onPasteRequested: (() -> Void)?
+    var onSelectionClick: ((ShelfItemID, SelectionModifiers, ShelfItemID?) -> Void)?
+    var onDragOutEnded: ((Set<ShelfItemID>, NSDragOperation) -> Void)?
     var onSimulateReceive: (() -> Void)?
 
     private let contentController: ShelfContentViewController
@@ -26,11 +48,26 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     var styleMask: NSWindow.StyleMask { panel.styleMask }
     var canBecomeKeyWindow: Bool { panel.canBecomeKey }
     var isVisible: Bool { panel.isVisible }
-    var isDragDestinationReady: Bool { panel.isVisible }
+    var frame: NSRect { panel.frame }
+
+    /// True when the window is visible and has registered pasteboard types for drops.
+    var isDragDestinationReady: Bool {
+        guard panel.isVisible else { return false }
+        return contentController.hasRegisteredDragTypes
+    }
 
     private static let emptySize = NSSize(width: 280, height: 220)
-    private static let collapsedSize = NSSize(width: 200, height: 160)
+    /// Same width as empty so Stage 1 skeleton controls fit; height marks collapsed.
+    private static let collapsedSize = NSSize(width: 280, height: 160)
     private static let expandedSize = NSSize(width: 420, height: 360)
+
+    static func size(for presentation: ShelfPresentation) -> NSSize {
+        switch presentation {
+        case .empty: return emptySize
+        case .collapsed: return collapsedSize
+        case .expanded: return expandedSize
+        }
+    }
 
     init(shelfID: ShelfID, openSource: ShelfOpenSource) {
         self.shelfID = shelfID
@@ -56,6 +93,14 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         contentController.onCloseRequested = { [weak self] in self?.close() }
         contentController.onToggleExpand = { [weak self] in self?.onToggleExpand?() }
         contentController.onCollapse = { [weak self] in self?.onCollapse?() }
+        contentController.onPasteboardDrop = { [weak self] pb in self?.onPasteboardDrop?(pb) ?? false }
+        contentController.onPasteRequested = { [weak self] in self?.onPasteRequested?() }
+        contentController.onSelectionClick = { [weak self] id, mods, anchor in
+            self?.onSelectionClick?(id, mods, anchor)
+        }
+        contentController.onDragOutEnded = { [weak self] ids, op in
+            self?.onDragOutEnded?(ids, op)
+        }
         contentController.onSimulateReceive = { [weak self] in self?.onSimulateReceive?() }
     }
 
@@ -77,9 +122,13 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         panel.close()
     }
 
-    func positionNearMouse(offset: NSPoint = .zero) {
+    func positionNearMouse(offset: NSPoint = .zero, mouseLocation: NSPoint? = nil) {
         let size = panel.frame.size
-        let origin = ShelfWindowGeometry.originNearMouse(size: size, offset: offset)
+        let origin = ShelfWindowGeometry.originNearMouse(
+            size: size,
+            offset: offset,
+            mouseLocation: mouseLocation ?? NSEvent.mouseLocation
+        )
         panel.setFrameOrigin(origin)
     }
 
@@ -110,7 +159,10 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
             self.panel.displayIfNeeded()
             self.refreshRoundedWindowChrome()
             if self.openSource == .shake {
-                onMilestone(.dragReady)
+                onMilestone(.transientWindowVisible)
+                if self.isDragDestinationReady {
+                    onMilestone(.dragReady)
+                }
             } else {
                 onMilestone(.firstFrameVisible)
             }
@@ -133,6 +185,8 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.becomesKeyOnlyIfNeeded = openSource == .shake
         panel.animationBehavior = .utilityWindow
+        panel.minSize = NSSize(width: 1, height: 1)
+        panel.contentMinSize = NSSize(width: 1, height: 1)
     }
 
     private func configureContent() {
@@ -172,12 +226,7 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func resize(for presentation: ShelfPresentation, animated: Bool) {
-        let size: NSSize
-        switch presentation {
-        case .empty: size = Self.emptySize
-        case .collapsed: size = Self.collapsedSize
-        case .expanded: size = Self.expandedSize
-        }
+        let size = Self.size(for: presentation)
 
         var frame = panel.frame
         let origin = ShelfWindowGeometry.clampedOrigin(
