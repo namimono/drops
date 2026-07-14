@@ -3,6 +3,11 @@ options:
   bundleIdPrefix: click.shakepin
   deploymentTarget:
     macOS: "13.0"
+  developmentLanguage: en
+  knownRegions:
+    - en
+    - zh-Hans
+    - Base
   createIntermediateGroups: true
   groupSortPosition: top
 settings:

@@ -38,6 +38,14 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     var onPasteRequested: (() -> Void)?
     var onSelectionClick: ((ShelfItemID, SelectionModifiers, ShelfItemID?) -> Void)?
     var onDragOutEnded: ((Set<ShelfItemID>, NSDragOperation) -> Void)?
+    var onOpenItem: ((ShelfItemID) -> Void)?
+    var onPreviewSelection: (() -> Void)?
+    var onRevealSelection: (() -> Void)?
+    var onRemoveSelection: (() -> Void)?
+    var onMergeSelection: (() -> Void)?
+    var onMergeDrag: ((ShelfItemID) -> Bool)?
+    var onCanMergeSelection: (() -> Bool)?
+    var onDisplayModeChange: ((ShelfDisplayMode) -> Void)?
     var onSimulateReceive: (() -> Void)?
 
     private let contentController: ShelfContentViewController
@@ -101,6 +109,14 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         contentController.onDragOutEnded = { [weak self] ids, op in
             self?.onDragOutEnded?(ids, op)
         }
+        contentController.onOpenItem = { [weak self] id in self?.onOpenItem?(id) }
+        contentController.onPreviewSelection = { [weak self] in self?.onPreviewSelection?() }
+        contentController.onRevealSelection = { [weak self] in self?.onRevealSelection?() }
+        contentController.onRemoveSelection = { [weak self] in self?.onRemoveSelection?() }
+        contentController.onMergeSelection = { [weak self] in self?.onMergeSelection?() }
+        contentController.onMergeDrag = { [weak self] id in self?.onMergeDrag?(id) ?? false }
+        contentController.onCanMergeSelection = { [weak self] in self?.onCanMergeSelection?() ?? false }
+        contentController.onDisplayModeChange = { [weak self] mode in self?.onDisplayModeChange?(mode) }
         contentController.onSimulateReceive = { [weak self] in self?.onSimulateReceive?() }
     }
 
@@ -135,8 +151,8 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     /// When `false`, size changes skip `NSWindow` animation (useful for rapid automated toggles).
     var animatesPresentationChanges = true
 
-    func apply(shelf: Shelf) {
-        contentController.apply(shelf: shelf)
+    func apply(shelf: Shelf, displayMode: ShelfDisplayMode = .grid) {
+        contentController.apply(shelf: shelf, displayMode: displayMode)
         resize(for: shelf.presentation, animated: animatesPresentationChanges)
     }
 
@@ -187,6 +203,9 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         panel.animationBehavior = .utilityWindow
         panel.minSize = NSSize(width: 1, height: 1)
         panel.contentMinSize = NSSize(width: 1, height: 1)
+        panel.setAccessibilityTitle(L10n.a11yShelfWindow)
+        // Follow system appearance (light/dark) without a fixed chrome color.
+        panel.appearance = nil
     }
 
     private func configureContent() {
@@ -197,7 +216,8 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         let container = NSVisualEffectView(frame: root.bounds)
         container.material = .hudWindow
         container.blendingMode = .behindWindow
-        container.state = .active
+        container.state = .followsWindowActiveState
+        container.appearance = nil
         container.wantsLayer = true
         container.layer?.cornerRadius = cornerRadius
         container.layer?.cornerCurve = .continuous

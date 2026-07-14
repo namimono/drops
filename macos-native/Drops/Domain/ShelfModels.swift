@@ -230,6 +230,40 @@ final class Shelf: @unchecked Sendable {
         return removed
     }
 
+    /// Replaces `removing` with `draft` at the visual position of `anchorID` (PRD 5.5).
+    /// Returns the inserted item and the removed items (for reference cleanup).
+    @discardableResult
+    func replaceItems(
+        removing ids: Set<ShelfItemID>,
+        inserting draft: ShelfItemDraft,
+        atAnchorID anchorID: ShelfItemID
+    ) -> (inserted: ShelfItem, removed: [ShelfItem]) {
+        let newItem = ShelfItem(from: draft)
+        let removed = items.filter { ids.contains($0.id) }
+        var next: [ShelfItem] = []
+        var inserted = false
+        for item in items {
+            if item.id == anchorID {
+                next.append(newItem)
+                inserted = true
+            }
+            if !ids.contains(item.id) {
+                next.append(item)
+            }
+        }
+        if !inserted {
+            next.insert(newItem, at: 0)
+        }
+        items = next
+        selection = [newItem.id]
+        if items.isEmpty {
+            presentation = .empty
+        } else if presentation == .empty {
+            presentation = .collapsed
+        }
+        return (newItem, removed)
+    }
+
     func setSelection(_ ids: Set<ShelfItemID>) {
         selection = ids.intersection(Set(items.map(\.id)))
     }

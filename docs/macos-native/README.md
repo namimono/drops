@@ -1,10 +1,10 @@
 # Drops macOS 原生化重构方案
 
-> 文档版本：V1.1<br>
+> 文档版本：V1.2<br>
 > 制定日期：2026-07-13<br>
 > 更新日期：2026-07-14<br>
 > 需求基线：[Drops-PRD.md](../Drops-PRD.md)<br>
-> 方案状态：产品范围已确认；阶段 0 / 阶段 1 / 阶段 2 已完成；下一阶段为阶段 3 原生交互完善<br>
+> 方案状态：产品范围已确认（不含图片/视频压缩）；阶段 0–2 已完成；阶段 3 代码已实现、待手工验收<br>
 > 开发进度：[development-progress.md](development-progress.md)<br>
 > 阶段 0 审查：[stage-0-review-issues.md](stage-0-review-issues.md)<br>
 > 阶段 1 审查：[stage-1-review-issues.md](stage-1-review-issues.md)
@@ -51,15 +51,16 @@ Drops 后续仅支持 macOS，并采用原生 Swift 完整重构。当前仓库�
 
 新实现以 PRD 为产品事实来源，现有代码仅用于理解历史行为、复用成熟算法和对照结果。
 
-PRD 第 8 章已经确认以下产品边界，原生工程必须直接按此实现：
+PRD 第 8 章已经确认以下产品边界；另据 2026-07-14 产品决策，图片/视频压缩亦不进入原生首版：
 
 - 不实现文件归档、媒体裁剪、音频提取、ICO 转换、视频下载和媒体下载。
-- 仅保留图片/视频压缩自身需要的格式转换与缩放，不提供独立辅助工具入口。
+- 不实现图片/视频压缩，以及压缩所需的格式转换、缩放、能力准备与任务调度。
+- 不提供独立辅助工具入口。
 - Drops 管理的临时文件默认保留 30 天，支持配置且最多保留 120 天。
 - 混选本地内容和链接时，空格只预览本地内容。
 - 首版完整支持英文和简体中文，并统一密码、加密和安全相关文案。
 
-不应把旧实现中的偶然行为或架构限制直接固化为新需求。
+不应把旧实现中的偶然行为或架构限制直接固化为新需求。`docs/Drops-PRD.md` 中仍有图片/视频压缩描述时，以本方案与阶段 0 冻结清单为准，后续再同步 PRD。
 
 ### 3.2 第一阶段范围
 
@@ -79,11 +80,9 @@ PRD 第 8 章已经确认以下产品边界，原生工程必须直接按此实�
 
 ### 3.3 后续范围
 
-以下能力在核心交互稳定后迁移：
+以下能力在核心交互稳定后迁移（均不含媒体压缩）：
 
-- 图片和视频压缩。
-- 图片/视频压缩所需的能力准备。
-- 临时文件保留设置、到期清理和手动清理。
+- 临时文件保留设置、到期清理和手动清理（阶段 2 已落地基础能力，阶段 3 完善设置入口）。
 - 完整设置、中英文、多语言基础设施、诊断导出和自动更新。
 
 ## 4. 目标架构
@@ -103,7 +102,6 @@ flowchart TD
     View --> Domain
     Pasteboard["PasteboardMaterializer"] --> Domain
     Preview["QuickLook / Workspace"] --> View
-    Operations["OperationService"] --> Domain
     Pasteboard --> Temporary["ManagedTemporaryFileStore"]
     Temporary --> Domain
     Retention["RetentionScheduler"] --> Temporary
@@ -117,9 +115,9 @@ flowchart TD
 - `ShelfWindowController` 只负责窗口位置、层级、焦点、大小和动画。
 - `ShelfContentViewController` 负责内容展示和用户操作，不直接决定全局生命周期。
 - 拖放和剪贴板服务输出标准化 `ShelfItem`，界面不直接解析 Pasteboard 类型。
-- 文件处理任务通过统一的任务协议更新进度、成功、失败和取消状态。
 - 临时文件必须进入应用专属的受管目录并持久化元数据，不能依赖可能被系统提前清除的通用临时目录。
 - 所有界面文案从 String Catalog 读取，业务和视图代码不得硬编码用户可见字符串。
+- 不引入媒体压缩或外部 CLI 媒体处理任务管线。
 
 ### 4.2 建议模块
 
@@ -137,8 +135,7 @@ macos-native/
 │   │   ├── ShelfState.swift
 │   │   ├── TemporaryFileRecord.swift
 │   │   ├── RetentionPolicy.swift
-│   │   ├── SelectionModel.swift
-│   │   └── OperationState.swift
+│   │   └── SelectionModel.swift
 │   ├── ShelfUI/
 │   │   ├── ShelfWindowController.swift
 │   │   ├── ShelfContentViewController.swift
@@ -154,7 +151,6 @@ macos-native/
 │   │   ├── PreviewService.swift
 │   │   ├── ManagedTemporaryFileStore.swift
 │   │   ├── RetentionScheduler.swift
-│   │   ├── OperationService.swift
 │   │   └── SettingsService.swift
 │   ├── SettingsUI/
 │   ├── AboutUI/
@@ -187,8 +183,6 @@ macos-native/
 
 - 设置页面。
 - 关于和许可证页面。
-- 首次能力准备页面。
-- 图片/视频压缩的质量、格式和尺寸参数表单。
 - 普通提示、进度和错误页面。
 
 SwiftUI 页面通过 ViewModel 调用领域服务，不直接持有内容架窗口或全局事件监听器。
@@ -211,7 +205,6 @@ final class Shelf {
     var presentation: ShelfPresentation
     var items: [ShelfItem]
     var selection: Set<ShelfItem.ID>
-    var operation: ShelfOperationState
 }
 ```
 
@@ -305,9 +298,8 @@ struct TemporaryFileRecord: Codable, Sendable {
 | 菜单栏和 AppHost 逻辑 | 按新 Application 层重新接入 |
 | 图标、图片和文案资源 | 校对后复用 |
 | Bundle、签名、权限、Sparkle 配置 | 切换发布入口时迁移 |
-| 图片/视频压缩的 CLI 参数和输出规则 | 作为 Swift 压缩任务服务的行为参考 |
 
-所有复用代码都需要先移除 Flutter 类型、MethodChannel 和全局单例状态依赖。
+所有复用代码都需要先移除 Flutter 类型、MethodChannel 和全局单例状态依赖。图片/视频压缩相关 Dart 代码、CLI 参数与工具链不迁移。
 
 ### 7.2 建议重写
 
@@ -320,19 +312,13 @@ struct TemporaryFileRecord: Codable, Sendable {
 
 旧实现可以用于对照，不应整段复制到新工程中。
 
-### 7.3 文件处理能力
+### 7.3 不迁移的文件处理能力
 
-现有图片和视频压缩能力主要由 Dart 组织外部命令和文件处理。迁移时建议定义统一协议：
+以下能力已移出原生首版范围，相关 Dart 代码、外部工具参数和 UI 入口均不迁移：
 
-```swift
-protocol ShelfOperation: Sendable {
-    var id: UUID { get }
-    func run(progress: @escaping @Sendable (Double) -> Void) async throws -> OperationResult
-    func cancel() async
-}
-```
-
-初期可以通过 Swift `Process` 调用现有图片/视频压缩工具，保持参数和输出规则一致；后续再决定是否替换为原生库。已移出产品范围的归档、裁剪、音频提取、ICO 转换和下载代码不迁移。
+- 图片/视频压缩、格式转换、缩放与视频转 GIF。
+- 处理能力检查与首次准备流程。
+- 归档、裁剪、音频提取、ICO 转换和媒体下载。
 
 ## 8. 实施阶段
 
@@ -344,10 +330,9 @@ protocol ShelfOperation: Sendable {
 | 阶段 1 | 建立内容架领域规则和稳定的多窗口骨架 | 多个内容架可独立创建、切换状态和关闭 | [内容架领域与窗口骨架](stage-1-shelf-domain-and-window.md) |
 | 阶段 2 | 打通拖入、剪贴板、拖出和临时文件安全管理闭环 | 基础拖放与粘贴场景通过，清理不触碰原始文件 | [拖放与剪贴板主链路](stage-2-drag-drop-and-pasteboard.md) |
 | 阶段 3 | 补齐符合 macOS 习惯的完整日常交互 | 核心内容架可连续日常使用，无阻断性交互问题 | [原生交互完善](stage-3-native-interactions.md) |
-| 阶段 4 | 交付限定范围内的图片与视频压缩 | PRD 9.3 通过，输出安全且任务可取消、可重试 | [图片与视频压缩](stage-4-media-compression.md) |
-| 阶段 5 | 完成回归、性能、迁移和发布收口 | 原生版本满足发布清单，正式流程只产出 macOS 应用 | [发布准备](stage-5-release-readiness.md) |
+| 阶段 4 | 完成回归、性能、迁移和发布收口 | 原生版本满足发布清单，正式流程只产出 macOS 应用 | [发布准备](stage-4-release-readiness.md) |
 
-阶段 0 至阶段 5 原则上顺序实施。下一阶段只有在上一阶段退出条件全部满足后才能进入；进入后仍需持续回归之前阶段的验收标准。PRD 已明确排除的功能边界适用于所有阶段，不得以迁移、兼容或技术预留名义重新引入。
+阶段 0 至阶段 4 原则上顺序实施。下一阶段只有在上一阶段退出条件全部满足后才能进入；进入后仍需持续回归之前阶段的验收标准。已明确排除的功能边界（含图片/视频压缩）适用于所有阶段，不得以迁移、兼容或技术预留名义重新引入。
 
 ## 9. 测试与验收
 
@@ -364,7 +349,6 @@ protocol ShelfOperation: Sendable {
 - 复制、移动和取消后的内容保留规则。
 - 关闭后忽略迟到事件。
 - 文本合并顺序和结果替换规则。
-- 任务成功、失败、取消和重试状态转换。
 - 混合选择本地内容与链接时只预览本地内容。
 - 临时文件默认保留 30 天，配置值不能超过 120 天。
 - 临时文件保留天数只接受正整数，非法输入不得覆盖上一次有效设置。
@@ -382,11 +366,10 @@ protocol ShelfOperation: Sendable {
 - 自动和手动清理均不删除外部拖入的原始文件。
 - 多文件、文件夹、URL 的拖入和拖出。
 - Quick Look 和 Finder 定位的输入过滤。
-- 外部进程取消、超时和错误输出解析。
 
 ### 9.2 手工验收
 
-以 PRD 第 9 章为主验收清单，并补充：
+以 PRD 第 9 章中仍在范围内的场景（9.1、9.2、9.4、9.5）为主验收清单，并补充：
 
 - 多显示器、不同缩放比例和屏幕边缘创建。
 - Finder、浏览器、邮件、聊天工具和 IDE 之间互相拖放。
@@ -407,7 +390,7 @@ protocol ShelfOperation: Sendable {
 - 主动创建内容架到首帧可见：P95 小于 300 ms。
 - 摇动触发到窗口可接收拖放：P95 小于 200 ms。
 - 收起/展开动画保持连续，不依赖异步任务完成。
-- 空内容架不启动 CLI 扫描、媒体探测或其他重任务。
+- 空内容架不启动无关重任务。
 - 20 个空内容架同时存在时不产生持续高 CPU 占用。
 
 ## 10. 单一原生工程与发布策略
@@ -416,7 +399,7 @@ protocol ShelfOperation: Sendable {
 
 `macos-native/Drops.xcodeproj` 是唯一继续开发的产品工程。所有新增功能、缺陷修复、测试和发布配置都进入该工程。
 
-现有 Flutter 代码冻结，只允许在迁移过程中读取和提取可复用的产品规则、算法、资源与外部工具参数。不得继续在 Flutter 版本上实现产品功能，也不得让原生工程依赖 Flutter 运行时。
+现有 Flutter 代码冻结，只允许在迁移过程中读取和提取可复用的产品规则、算法与资源。不得继续在 Flutter 版本上实现产品功能，也不得让原生工程依赖 Flutter 运行时。媒体压缩相关代码与外部工具不迁移。
 
 ### 10.2 平台范围
 
@@ -432,7 +415,7 @@ Drops 仅支持 macOS：
 
 只有满足以下条件后才发布原生版本：
 
-- PRD 核心验收场景全部通过。
+- 范围内的 PRD 核心验收场景（9.1、9.2、9.4、9.5）全部通过。
 - 原生版本连续日常试用期间不存在阻断性窗口或拖放问题。
 - 设置、快捷键和更新配置完成迁移验证。
 - 仓库构建和发布流程不再依赖 Flutter 与 Windows 工具链。
@@ -441,11 +424,10 @@ Drops 仅支持 macOS：
 
 | 风险 | 控制措施 |
 |---|---|
-| 重写范围过大导致长期不可用 | 先交付内容架 MVP，再迁移图片/视频压缩 |
-| 把旧实现缺陷复制到新版本 | PRD 和验收用例优先，旧代码只作参考 |
+| 重写范围过大导致长期不可用 | 先交付内容架核心交互，再做发布收口；不并行迁移媒体压缩 |
+| 把旧实现缺陷复制到新版本 | 冻结清单与验收用例优先，旧代码只作参考 |
 | 全 SwiftUI 再次遇到拖放和窗口限制 | AppKit 承担核心窗口和拖放，SwiftUI 仅用于普通页面 |
-| 图片/视频压缩迁移耗时 | 初期继续使用现有外部工具，先迁移调度层 |
-| 一次性移除旧工程导致参考能力丢失 | 先迁移规则、资源和工具参数，再从构建流程与仓库中清理旧代码 |
+| 一次性移除旧工程导致参考能力丢失 | 先迁移规则与资源，再从构建流程与仓库中清理旧代码 |
 | 发布配置迁移影响现有用户 | 单独验证 Bundle ID、签名、设置迁移和 Sparkle 更新链路 |
 | 临时文件泄漏或误删原文件 | 受管 Application Support 目录、来源标记、活跃引用、路径边界校验和清理测试 |
 | 中英文文案遗漏或语义不一致 | String Catalog 完整性检查、术语表和双语验收 |

@@ -154,16 +154,19 @@ final class ShelfWindowGeometryTests: XCTestCase {
 
     func testOriginNearMouseCentersThenClamps() {
         let size = NSSize(width: 200, height: 100)
+        let mouse = NSPoint(x: 100, y: 100)
         let origin = ShelfWindowGeometry.originNearMouse(
             size: size,
             offset: .zero,
-            mouseLocation: NSPoint(x: 100, y: 100),
+            mouseLocation: mouse,
             screens: NSScreen.screens
         )
-        // With at least one screen, result must be a finite point inside some visible frame.
+        // Clamp uses the screen containing the mouse, not necessarily NSScreen.main.
         XCTAssertFalse(origin.x.isNaN)
         XCTAssertFalse(origin.y.isNaN)
-        if let screen = NSScreen.main {
+        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) })
+            ?? NSScreen.main
+        if let screen {
             let visible = screen.visibleFrame
             XCTAssertGreaterThanOrEqual(origin.x, visible.minX + 8 - 0.5)
             XCTAssertGreaterThanOrEqual(origin.y, visible.minY + 8 - 0.5)

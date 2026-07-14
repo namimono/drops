@@ -6,11 +6,14 @@
 > 阶段 0 实施：[stage-0-requirements-and-validation.md](./stage-0-requirements-and-validation.md)  
 > 阶段 1 实施：[stage-1-shelf-domain-and-window.md](./stage-1-shelf-domain-and-window.md)  
 > 阶段 2 实施：[stage-2-drag-drop-and-pasteboard.md](./stage-2-drag-drop-and-pasteboard.md)  
+> 阶段 3 实施：[stage-3-native-interactions.md](./stage-3-native-interactions.md)  
+> 阶段 3 手工验收：[stage-3-manual-acceptance.md](./stage-3-manual-acceptance.md)  
 > 阶段 0 审查：[stage-0-review-issues.md](./stage-0-review-issues.md)<br>
 > 阶段 1 审查：[stage-1-review-issues.md](./stage-1-review-issues.md)<br>
 > 阶段 2 审查：[stage-2-review-issues.md](./stage-2-review-issues.md)<br>
+> 阶段 3 审查：[stage-3-review-issues.md](./stage-3-review-issues.md)<br>
 > 基线分支：当前工作区（原生工程位于 `macos-native/`）  
-> 平台 / 范围：仅 macOS 13.0+；阶段 2 拖放与剪贴板主链路
+> 平台 / 范围：仅 macOS 13.0+；阶段 3 原生交互完善
 
 ---
 
@@ -18,121 +21,107 @@
 
 | 阶段 | 方案内容 | 状态 | 说明 |
 |---|---|---|---|
-| 阶段 0 | 需求冻结与技术验证 | **已完成** | S0-01～S0-10 通过；可进入阶段 1 |
-| 阶段 1 | 内容架领域与窗口骨架 | **已完成** | REV-S1-001～005 已关闭；自动化 42/42；手工 S1-01/07/08/10 通过 |
-| 阶段 2 | 拖放与剪贴板主链路 | **已完成** | REV-S2-001～009 已关闭；自动化 69/69；手工 S2-01/05/06/13 通过 |
-| 阶段 3 | 原生交互完善 | **未开始** | — |
-| 阶段 4 | 图片与视频压缩 | **未开始** | — |
-| 阶段 5 | 发布准备 | **未开始** | — |
+| 阶段 0 | 需求冻结与技术验证 | **已完成** | S0-01～S0-10 通过 |
+| 阶段 1 | 内容架领域与窗口骨架 | **已完成** | REV-S1 已关闭 |
+| 阶段 2 | 拖放与剪贴板主链路 | **已完成** | REV-S2 已关闭 |
+| 阶段 3 | 原生交互完善 | **代码已实现，待手工验收** | REV-S3 已关闭；本地化/收起堆/无障碍标签/阶段 4 接入点规划已落地；自动化 88/88 |
+| 阶段 4 | 发布准备 | **未开始** | 接入点规划见 [stage-4 §9](./stage-4-release-readiness.md#9-发布接入点规划阶段-3-预埋) |
 
-**综合判断：阶段 2 已完成。审查缺陷已关闭，自动化 69/69，手工验收 S2-01/05/06/13 通过；S2-01～S2-13 全部满足退出条件，可进入阶段 3。**
+**综合判断：阶段 3 产品代码与自动化回归已就绪（88/88）。请按 [手工验收清单](./stage-3-manual-acceptance.md) 完成 S3-01/03/05/07～14 勾选后再申请退出阶段 3。**
 
 ## 2. 已实现能力
 
-- 内容架领域：`Shelf` / 生命周期 / 展示态 / 选择集合 / 真实内容项（文件、文件夹、链接、受管临时文件）。
-- `ShelfLifecycleStore`：主动持久、摇动临时、接收晋升、未接收关闭、上限 20、关闭后忽略迟到事件；拖拽会话同 ID 幂等、异 ID 抢占并回收 orphan 临时架；晋升按会话 ID 门禁。
-- `ShelfManager` + `ShelfWindowController`：多窗独立创建/关闭；真实拖入/粘贴接入；拖出 copy/move/cancel；临时文件引用在移除与关窗时释放；退出时协调引用清理。
-- `PasteboardMaterializer` + `ManagedTemporaryFileStore`：文件引用直入；跨内容架保留受管 ID；纯文本/图片/RTF/HTML/PDF 等落盘；批次失败回滚；同批重名追加序号。
-- 去重与排序：按路径/URL `identityKey`；新内容置顶；重复加入前移不造副本；新内容加入选择集。
-- 选择：单击 / ⌘单击 / Shift 范围（锚点跨刷新稳定）；单项/多选/收起态整堆拖出。
-- `GlobalInputCoordinator` + `ShakeDetector`：外部拖拽会话、摇动/Shift 唤起临时架；`dragReady` 里程碑恢复。
-- `SettingsStore` + `RetentionScheduler`：保留天数 1…120；菜单入口与非法输入提示；启动与每日清理；手动清理二次确认。
-- 菜单栏 **New Shelf**、**Retention Days…**、临时架 Demo、**Clean Temporary Files Now…**；默认全局快捷键 **⌘⌥Space**。
+### 阶段 0–2（基线）
+
+- 内容架领域、生命周期、拖入/拖出、剪贴板物化、摇动唤起、保留清理等。
+
+### 阶段 3
+
+- 网格 / 列表、图标与缩略图、打开 / 定位 / Quick Look、右键、文本合并、Settings / About / Logs。
+- **收起态重叠堆**：最多露出 3 个图标 + 数量文案；拖动整堆；双击展开。
+- **本地化**：`Localizable.xcstrings`（en + zh-Hans）；设置语言覆盖立即生效；不支持系统语言回退英文。
+- **无障碍**：内容架 / 列表 / 网格 / 收起堆 / 按钮 / 菜单栏 VoiceOver 标签；临时架不抢焦点。
+- **深浅色**：HUD `NSVisualEffectView` 跟随系统外观。
+- **阶段 4 预埋**：Sandbox / Developer ID / 公证接入点与切换顺序已写入阶段 4 文档。
 
 ## 3. 已落地的架构改动
 
 | 模块 | 路径 | 职责 |
 |---|---|---|
-| 领域模型 | `macos-native/Drops/Domain/ShelfModels.swift` | 打开来源、生命周期、展示、内容项、选择与拖出规则 |
-| 内容草稿 | `macos-native/Drops/Domain/ShelfItemModels.swift` | `ShelfItemKind` / `ShelfItemDraft` |
-| 生命周期库 | `macos-native/Drops/Domain/ShelfLifecycleStore.swift` | 纯领域创建/晋升/关闭/会话规则 |
-| 管理器 | `macos-native/Drops/Application/ShelfManager.swift` | 领域 + 窗口 + 剪贴板接入 + 引用提交/释放 |
-| 窗口 | `macos-native/Drops/ShelfUI/ShelfWindowController.swift` | 无边框浮窗、焦点、圆角、尺寸、`dragReady` |
-| 内容视图 | `macos-native/Drops/ShelfUI/ShelfContentViewController.swift` | 拖入高亮、列表、选择锚点、拖出受管类型、粘贴 |
-| 剪贴板 | `macos-native/Drops/Services/PasteboardMaterializer.swift` | Pasteboard → `ShelfItemDraft`（事务批次） |
-| 临时文件 | `macos-native/Drops/Services/ManagedTemporaryFileStore.swift` | 受管落盘、引用、启动清陈旧引用、安全删除 |
-| 保留策略 | `macos-native/Drops/Services/SettingsStore.swift` / `RetentionScheduler.swift` | 设置与清理调度 |
-| 输入 | `macos-native/Drops/Input/GlobalInputCoordinator.swift` / `ShakeDetector.swift` | 外部拖拽与摇动 |
-| 应用宿主 | `macos-native/Drops/Application/ApplicationController.swift` | 启动、菜单、快捷键、确认清理、退出接线 |
+| 本地化 | `Resources/Localizable.xcstrings` + `Services/AppLocalization.swift` | Catalog + 运行时语言解析 / `L10n` |
+| 收起堆 | `ShelfUI/CollapsedStackView.swift` | 最多 3 图标重叠堆 |
+| 内容 UI | `ShelfUI/ShelfContentViewController.swift` | 收起堆 / 展开网格列表 / 本地化 / a11y |
+| 设置 | `Application/SettingsWindowController.swift` | 语言切换驱动 `AppLocalization` |
+| 发布规划 | `docs/macos-native/stage-4-release-readiness.md` §9 | Sandbox / 签名 / 公证接入点 |
 
 ## 4. 已知偏差 / 限制
 
-1. **App Sandbox 关闭**：沿用阶段 0；阶段 5 再启用。
-2. **String Catalog 未建**：骨架与菜单文案仍为英文硬编码；阶段 3 再统一本地化。
-3. **Prototype 保留未编译**：`Drops/Prototype/` 排除出 Target，仅作历史参考。
-4. **收起态宽度**：collapsed 与 empty 同宽 280；Stage 3 UI 可再收窄。
-5. **完整网格/列表视觉、Quick Look、右键菜单、文本合并**：属阶段 3，本阶段仅列表骨架 + 拖放闭环。
-6. **保留天数 UI**：阶段 2 提供菜单对话框最小入口；完整设置页属阶段 3。
+1. **App Sandbox 仍关闭**：阶段 4 按文档启用并补 bookmark。
+2. **部分系统对话框**：语言覆盖立即作用于 Drops UI；极少数系统级对话框可能需重启后完全跟随（设置页已提示）。
+3. **内容插入微动画 / 高频压力**：窗口尺寸动画既有；S3-08 仍依赖手工压力验收。
+4. **Prototype 未编译**：仅作历史参考。
 
 ## 5. 验证与修复记录
 
 | 类型 / 级别 | 场景或问题 | 状态 | 证据 / 修复 |
 |---|---|---|---|
-| 构建 / 单测 | Debug 测试 69/69 | **通过** | 修复后 `xcodebuild test -scheme Drops -destination 'platform=macOS'`（2026-07-14） |
-| 构建 / 静态分析 | Release 构建、Xcode Analyze | **修复前通过；修复后待复跑** | 独立 DerivedData + `CODE_SIGNING_ALLOWED=NO`（2026-07-14 review） |
-| 代码审查 / P0 | 跨内容架受管引用丢失 | **已修复** | 私有 pasteboard 类型 + `addReference`；`testCrossShelfManagedDragAddsReferenceAndProtectsCleanup` |
-| 代码审查 / P1-P2 | REV-S2-002～009 | **已修复** | 见 [阶段 2 审查清单](./stage-2-review-issues.md) |
-| 自动化 S2-02 | 去重前移与新内容置顶 | **通过** | `ShelfItemDomainTests` |
-| 自动化 S2-03 | 文本/图片/链接/RTF/PDF 物化 | **通过** | `PasteboardMaterializerTests`（显式 RTF 优先于合成 plain text） |
-| 自动化 S2-04 | 选择与拖出载荷 / Shift 锚点 | **通过** | `ShelfItemDomainTests` + `testSelectionAnchorSurvivesApplyRefresh` |
-| 自动化 S2-07 | 接收晋升 / 未接收关闭 | **通过** | 既有生命周期测试 + `ShelfManagerContentTests` |
-| 自动化 S2-08/09/10/11/12 | 保留天数、引用保护、清理确认、路径边界 | **通过** | Settings / Store / Manager 回归（含跨架引用与重启清引用） |
-| 自动化 dragReady | 临时窗注册拖放类型 | **通过** | `Stage0LaunchAndWindowTests` |
-| 手工 S2-01 | Finder/第三方拖入识别 | **通过** | 人工验收（2026-07-14） |
-| 手工 S2-05 | 复制保留 / 移动移除 / 取消保持 | **通过** | 人工验收（2026-07-14） |
-| 手工 S2-06 | 临时架会话、焦点、可接收时限 | **通过** | 人工验收（2026-07-14） |
-| 手工 S2-13 | 快速拖入拖出取消关窗压力 | **通过** | 人工验收（2026-07-14） |
+| 构建 / 单测 | Debug 测试 88/88 | **通过** | `xcodebuild test -scheme Drops -destination 'platform=macOS'`（2026-07-14） |
+| 自动化 | en / zh-Hans 覆盖与手动切换 | **通过** | `AppLocalizationTests` |
+| 自动化 | 收起堆显示 / 展开隐藏 | **通过** | `CollapsedStackViewTests` |
+| 审查 | REV-S3-001～005 | **已关闭** | 见 stage-3-review-issues.md |
+| 手工 | S3-01/03/05/07～14 | **待验证** | [stage-3-manual-acceptance.md](./stage-3-manual-acceptance.md) |
 
 ## 6. 未完成 / 待办
 
 ### P0 · 正确性或稳定性
 
-- [x] 实施阶段 2 真实拖放与剪贴板（代码 + 自动化）。
-- [x] 修复 REV-S2-001～009 并补充针对性回归。
-- [x] 完成阶段 2 手工验收：S2-01、S2-05、S2-06、S2-13。
-- [x] 阶段 2 退出条件：S2-01～S2-13 全部通过。
+- [x] REV-S3-001～005。
+- [x] String Catalog（en + zh-Hans）+ 运行时语言覆盖。
+- [ ] 按 [手工验收清单](./stage-3-manual-acceptance.md) 完成勾选并记录问题。
 
 ### P1 · 治理、性能或维护性
 
-- [ ] 规划阶段 5 的 Sandbox / Developer ID / 公证接入点（不阻塞阶段 3）。
-- [ ] 将硬编码文案迁入 String Catalog（阶段 3）。
-- [ ] 完整设置页承载保留天数编辑（当前为菜单对话框最小入口）。
+- [x] 收起态重叠堆视觉（最多 3 图标）。
+- [x] VoiceOver / 焦点代码侧能力（标签 + 临时架不抢焦点）；**手工勾选 S3-14 仍待做**。
+- [x] 多屏 / 深浅色代码侧适配 + 验收清单；**手工勾选 S3-09 仍待做**。
+- [x] 规划阶段 4 的 Sandbox / Developer ID / 公证接入点。
 
 ## 7. 验收对照
 
 | 验收项 | 状态 |
 |---|---|
-| S2-01 Finder/第三方拖入识别 | **已验证（手工）** |
-| S2-02 新内容置顶与去重前移 | **已验证（自动化）** |
-| S2-03 粘贴文本/图片/链接/RTF/PDF | **已验证（自动化；显式 RTF 保留）** |
-| S2-04 单项/多选/区间/收起整堆拖出 | **已验证（领域 + UI 锚点自动化）** |
-| S2-05 复制保留 / 移动移除 / 取消保持 | **已验证（自动化 + 手工）** |
-| S2-06 单会话临时架 + 不抢焦点 + 及时可接收 | **已验证（自动化 + 手工）** |
-| S2-07 接收晋升 / 未接收关闭 | **已验证（自动化）** |
-| S2-08 保留天数 1…120 非法不覆盖 | **已验证（服务 + 菜单入口提示自动化）** |
-| S2-09 改天数后重算到期 | **已验证（自动化）** |
-| S2-10 引用保护延迟清理 | **已验证（跨架引用 + 重启清陈旧引用自动化）** |
-| S2-11 手动清理跳过引用并计数 | **已验证（服务 + 二次确认门禁自动化）** |
-| S2-12 不删原始/外链/逃逸路径 | **已验证（自动化；存储不可用时禁用物化）** |
-| S2-13 快速拖入拖出取消关窗压力 | **已验证（失败回滚自动化 + 压力手工）** |
+| S3-01 网格/列表与图标缩略图 | **代码已实现，待手工验证** |
+| S3-02 选择一致性 | **代码已实现，待手工验证** |
+| S3-03 打开 / 定位 / 失败反馈 | **代码已实现，待手工验证** |
+| S3-04 混选预览 | **已验证（自动化决策）**；QL 待手工 |
+| S3-05 右键 / 移除安全 | **代码已实现，待手工验证** |
+| S3-06 菜单文本合并 | **已验证（自动化）** |
+| S3-07 拖放文本合并 | **代码已实现，待手工验证** |
+| S3-08 动画与高频 | **待手工验证** |
+| S3-09 多屏 / 缩放 / 深浅色 | **代码已实现，待手工验证**（清单已备） |
+| S3-10 菜单栏入口 | **代码已实现，待手工验证** |
+| S3-11 英/简中与回退 | **代码已实现，待手工验证**（有自动化抽查） |
+| S3-12 双语布局 | **待手工验证** |
+| S3-13 安全文案 | **代码已实现，待产品抽查** |
+| S3-14 无障碍与焦点 | **代码已实现，待手工验证**（清单已备） |
 
 ## 8. 建议下一迭代顺序
 
-1. 进入 [stage-3-native-interactions.md](./stage-3-native-interactions.md)：完整原生交互、网格/列表视觉、Quick Look、右键菜单等。
-2. 阶段 3 内将硬编码文案迁入 String Catalog，并视需要扩展完整设置页。
+1. 按 [stage-3-manual-acceptance.md](./stage-3-manual-acceptance.md) 手工验收并回填结果。
+2. 修复手工发现的问题后申请阶段 3 退出。
+3. 进入 [stage-4-release-readiness.md](./stage-4-release-readiness.md)，按 §9 启用 Sandbox → Developer ID → 公证。
 
 ## 9. 变更文件速查
 
-**阶段 2 审查修复（本轮）**
+**本轮（本地化 / 收起堆 / a11y / 阶段 4 规划）**
 
-- `macos-native/Drops/Services/PasteboardMaterializer.swift`
-- `macos-native/Drops/Services/ManagedTemporaryFileStore.swift`
-- `macos-native/Drops/Application/ShelfManager.swift`
-- `macos-native/Drops/Application/ApplicationController.swift`
-- `macos-native/Drops/Application/MenuBarController.swift`
-- `macos-native/Drops/Application/AppDelegate.swift`
+- `macos-native/Drops/Resources/Localizable.xcstrings`
+- `macos-native/Drops/Services/AppLocalization.swift`
+- `macos-native/Drops/ShelfUI/CollapsedStackView.swift`
 - `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`
-- `macos-native/DropsTests/PasteboardMaterializerTests.swift`
-- `macos-native/DropsTests/ShelfManagerContentTests.swift`
-- `docs/macos-native/stage-2-review-issues.md`
+- `macos-native/Drops/ShelfUI/ShelfWindowController.swift`
+- `macos-native/Drops/Application/{MenuBar,Settings,About,Application}Controller.swift`
+- `macos-native/DropsTests/AppLocalizationTests.swift` / `CollapsedStackViewTests.swift`
+- `docs/macos-native/stage-3-manual-acceptance.md`
+- `docs/macos-native/stage-4-release-readiness.md`（§9）
 - `docs/macos-native/development-progress.md`

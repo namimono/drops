@@ -211,7 +211,7 @@ final class ShelfManagerContentTests: XCTestCase {
         let before = controller.managerForTesting.retentionDays
         controller.configureRetentionDays()
         XCTAssertEqual(controller.managerForTesting.retentionDays, before)
-        XCTAssertEqual(seenTitles, ["Invalid Retention Days"])
+        XCTAssertEqual(seenTitles, [L10n.invalidRetention])
     }
 
     func testSelectionAnchorSurvivesApplyRefresh() {

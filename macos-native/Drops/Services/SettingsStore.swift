@@ -1,11 +1,22 @@
 import Foundation
 
-/// Persists user-facing preferences that Stage 2 needs (retention days).
+/// Persists user-facing preferences (retention, display mode, language).
 final class SettingsStore {
     static let retentionDaysKey = "drops.retentionDays"
+    static let displayModeKey = "drops.shelfDisplayMode"
+    static let languageOverrideKey = "drops.languageOverride"
+
+    /// `system` follows macOS; otherwise an explicit BCP-47 code (`en`, `zh-Hans`).
+    enum LanguageOverride: String, Codable, Sendable, Equatable, CaseIterable {
+        case system
+        case english = "en"
+        case simplifiedChinese = "zh-Hans"
+    }
 
     private let defaults: UserDefaults
     private(set) var retentionDays: Int
+    private(set) var displayMode: ShelfDisplayMode
+    private(set) var languageOverride: LanguageOverride
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -14,6 +25,20 @@ final class SettingsStore {
             retentionDays = stored
         } else {
             retentionDays = RetentionPolicy.defaultDays
+        }
+
+        if let raw = defaults.string(forKey: Self.displayModeKey),
+           let mode = ShelfDisplayMode(rawValue: raw) {
+            displayMode = mode
+        } else {
+            displayMode = .grid
+        }
+
+        if let raw = defaults.string(forKey: Self.languageOverrideKey),
+           let language = LanguageOverride(rawValue: raw) {
+            languageOverride = language
+        } else {
+            languageOverride = .system
         }
     }
 
@@ -24,5 +49,15 @@ final class SettingsStore {
         retentionDays = policy.days
         defaults.set(retentionDays, forKey: Self.retentionDaysKey)
         return retentionDays
+    }
+
+    func setDisplayMode(_ mode: ShelfDisplayMode) {
+        displayMode = mode
+        defaults.set(mode.rawValue, forKey: Self.displayModeKey)
+    }
+
+    func setLanguageOverride(_ language: LanguageOverride) {
+        languageOverride = language
+        defaults.set(language.rawValue, forKey: Self.languageOverrideKey)
     }
 }

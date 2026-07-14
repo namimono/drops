@@ -11,6 +11,8 @@ final class ShelfManager {
     private let temporaryStore: ManagedTemporaryFileStore?
     private let materializer: PasteboardMaterializer?
     private let settings: SettingsStore
+    private let itemActions: ItemActionService
+    private var textMerge: TextMergeService?
     private(set) var retentionScheduler: RetentionScheduler?
     /// True when Application Support managed storage could not be initialized.
     private(set) var isTemporaryStoreUnavailable = false
@@ -18,15 +20,24 @@ final class ShelfManager {
     var activeCount: Int { store.activeCount }
     var hasActiveExternalDrag: Bool { store.dragSession != nil }
     var currentDragSessionId: DragSessionID? { store.dragSession?.id }
+    var displayMode: ShelfDisplayMode { settings.displayMode }
+    /// Shared preferences used by Settings UI and shelf windows.
+    var settingsStore: SettingsStore { settings }
+
+    /// Non-blocking user feedback for open/reveal failures (title, message). Override in tests.
+    var onUserFacingError: ((String, String) -> Void)?
 
     init(
         temporaryStore: ManagedTemporaryFileStore? = nil,
-        settings: SettingsStore = SettingsStore()
+        settings: SettingsStore = SettingsStore(),
+        itemActions: ItemActionService = ItemActionService()
     ) {
         self.settings = settings
+        self.itemActions = itemActions
         if let temporaryStore {
             self.temporaryStore = temporaryStore
             self.materializer = PasteboardMaterializer(temporaryStore: temporaryStore)
+            self.textMerge = TextMergeService(temporaryStore: temporaryStore)
             self.retentionScheduler = RetentionScheduler(temporaryStore: temporaryStore)
             self.isTemporaryStoreUnavailable = false
         } else {
@@ -36,11 +47,13 @@ final class ShelfManager {
                 created.clearAllShelfReferences()
                 self.temporaryStore = created
                 self.materializer = PasteboardMaterializer(temporaryStore: created)
+                self.textMerge = TextMergeService(temporaryStore: created)
                 self.retentionScheduler = RetentionScheduler(temporaryStore: created)
                 self.isTemporaryStoreUnavailable = false
             } catch {
                 self.temporaryStore = nil
                 self.materializer = nil
+                self.textMerge = nil
                 self.retentionScheduler = nil
                 self.isTemporaryStoreUnavailable = true
                 NSLog(
@@ -85,7 +98,7 @@ final class ShelfManager {
         #endif
         wire(controller)
         windows[shelf.id] = controller
-        controller.apply(shelf: shelf)
+        controller.apply(shelf: shelf, displayMode: settings.displayMode)
         if nearMouse {
             controller.positionNearMouse(offset: mouseOffset, mouseLocation: mouseLocation)
         }
@@ -215,6 +228,187 @@ final class ShelfManager {
             // Copy / cancel / other: keep content and selection.
             refreshWindow(shelfId: shelfId)
         }
+    }
+
+    func setDisplayMode(_ mode: ShelfDisplayMode) {
+        settings.setDisplayMode(mode)
+        for id in windows.keys {
+            refreshWindow(shelfId: id)
+        }
+    }
+
+    @discardableResult
+    func openSelection(shelfId: ShelfID) -> Bool {
+        guard let shelf = activeShelf(id: shelfId) else { return false }
+        let targets = shelf.orderedSelection()
+        guard let first = targets.first else { return false }
+        return open(item: first)
+    }
+
+    @discardableResult
+    func openItem(shelfId: ShelfID, itemID: ShelfItemID) -> Bool {
+        guard let shelf = activeShelf(id: shelfId),
+              let item = shelf.items.first(where: { $0.id == itemID }) else { return false }
+        return open(item: item)
+    }
+
+    @discardableResult
+    func revealSelectionInFinder(shelfId: ShelfID) -> Bool {
+        guard let shelf = activeShelf(id: shelfId) else { return false }
+        let locals = shelf.orderedSelection().filter(\.isLocalFile)
+        guard !locals.isEmpty else {
+            reportUserFacingError(title: L10n.unableToReveal, message: L10n.revealNeedsLocal)
+            return false
+        }
+        do {
+            _ = try itemActions.revealInFinder(locals)
+            return true
+        } catch {
+            let sample = locals.first!
+            NSLog("[Shelf] reveal failed: %@", "\(error)")
+            reportUserFacingError(
+                title: L10n.unableToReveal,
+                message: """
+                \(L10n.couldNotReveal(sample.displayName))
+
+                \(ItemActionService.recoverySuggestion(for: sample, error: error))
+                """
+            )
+            return false
+        }
+    }
+
+    private func open(item: ShelfItem) -> Bool {
+        do {
+            try itemActions.open(item)
+            return true
+        } catch {
+            NSLog("[Shelf] open failed: %@", "\(error)")
+            reportUserFacingError(
+                title: L10n.unableToOpen,
+                message: """
+                \(L10n.couldNotOpen(item.displayName))
+
+                \(ItemActionService.recoverySuggestion(for: item, error: error))
+                """
+            )
+            return false
+        }
+    }
+
+    private func reportUserFacingError(title: String, message: String) {
+        NSSound.beep()
+        if let onUserFacingError {
+            onUserFacingError(title, message)
+        } else {
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = message
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: L10n.ok)
+            alert.runModal()
+        }
+    }
+
+    @discardableResult
+    func previewSelection(shelfId: ShelfID) -> Bool {
+        guard let shelf = activeShelf(id: shelfId) else { return false }
+        let ordered = shelf.orderedSelection()
+        return QuickLookPreviewController.shared.preview(orderedSelection: ordered) { [weak self] url in
+            do {
+                try self?.itemActions.open(
+                    ShelfItem(
+                        identityKey: url.absoluteString,
+                        displayName: url.absoluteString,
+                        kind: .link,
+                        linkURL: url
+                    )
+                )
+            } catch {
+                NSLog("[Shelf] link preview open failed: %@", "\(error)")
+                NSSound.beep()
+            }
+        }
+    }
+
+    @discardableResult
+    func removeSelection(shelfId: ShelfID) -> Bool {
+        guard let shelf = activeShelf(id: shelfId) else { return false }
+        let ids = shelf.selection
+        guard !ids.isEmpty else { return false }
+        return removeItems(shelfId: shelfId, ids: ids)
+    }
+
+    /// Menu merge of selected plain-text items (PRD 5.5.1).
+    @discardableResult
+    func mergeSelectedText(shelfId: ShelfID) -> Bool {
+        guard let shelf = activeShelf(id: shelfId), let textMerge else { return false }
+        let ordered = shelf.orderedSelection().filter(\.isPlainTextForMerge)
+        guard ordered.count >= 2, let anchor = ordered.first else { return false }
+        do {
+            let draft = try textMerge.mergeMenuSelection(
+                ordered,
+                displayName: L10n.mergedTextFileName
+            )
+            let result = shelf.replaceItems(
+                removing: Set(ordered.map(\.id)),
+                inserting: draft,
+                atAnchorID: anchor.id
+            )
+            releaseReferences(result.removed, shelfID: shelfId)
+            commitManagedReferences(for: [result.inserted], shelfID: shelfId)
+            refreshWindow(shelfId: shelfId)
+            return true
+        } catch {
+            NSLog("[Shelf] text merge failed: %@", "\(error)")
+            NSSound.beep()
+            return false
+        }
+    }
+
+    /// Drag-append merge onto `targetID` (PRD 5.5.2).
+    @discardableResult
+    func mergeTextByDrag(shelfId: ShelfID, targetID: ShelfItemID) -> Bool {
+        guard let shelf = activeShelf(id: shelfId), let textMerge else { return false }
+        guard let target = shelf.items.first(where: { $0.id == targetID }),
+              target.isPlainTextForMerge else { return false }
+        let sources = shelf.orderedSelection().filter { $0.id != targetID && $0.isPlainTextForMerge }
+        guard !sources.isEmpty else { return false }
+        do {
+            let draft = try textMerge.mergeDragAppend(
+                target: target,
+                sources: sources,
+                displayName: L10n.mergedTextFileName
+            )
+            var removing = Set(sources.map(\.id))
+            removing.insert(target.id)
+            let result = shelf.replaceItems(
+                removing: removing,
+                inserting: draft,
+                atAnchorID: target.id
+            )
+            releaseReferences(result.removed, shelfID: shelfId)
+            commitManagedReferences(for: [result.inserted], shelfID: shelfId)
+            refreshWindow(shelfId: shelfId)
+            return true
+        } catch {
+            NSLog("[Shelf] drag text merge failed: %@", "\(error)")
+            NSSound.beep()
+            return false
+        }
+    }
+
+    func canMergeSelectedText(shelfId: ShelfID) -> Bool {
+        guard let shelf = activeShelf(id: shelfId) else { return false }
+        let plain = shelf.orderedSelection().filter(\.isPlainTextForMerge)
+        return plain.count >= 2
+    }
+
+    private func activeShelf(id: ShelfID) -> Shelf? {
+        guard !store.shouldIgnoreEvent(shelfId: id),
+              let shelf = store.shelf(id: id),
+              shelf.isActive else { return nil }
+        return shelf
     }
 
     /// Stage 1 compat: simulate content receive / transient promotion without real pasteboard.
@@ -362,6 +556,45 @@ final class ShelfManager {
                 self?.handleDragOutEnded(shelfId: id, itemIDs: itemIDs, operation: operation)
             }
         }
+        controller.onOpenItem = { [weak self] itemID in
+            self?.handleLateEvent(shelfId: id) {
+                _ = self?.openItem(shelfId: id, itemID: itemID)
+            }
+        }
+        controller.onPreviewSelection = { [weak self] in
+            self?.handleLateEvent(shelfId: id) {
+                _ = self?.previewSelection(shelfId: id)
+            }
+        }
+        controller.onRevealSelection = { [weak self] in
+            self?.handleLateEvent(shelfId: id) {
+                _ = self?.revealSelectionInFinder(shelfId: id)
+            }
+        }
+        controller.onRemoveSelection = { [weak self] in
+            self?.handleLateEvent(shelfId: id) {
+                _ = self?.removeSelection(shelfId: id)
+            }
+        }
+        controller.onMergeSelection = { [weak self] in
+            self?.handleLateEvent(shelfId: id) {
+                _ = self?.mergeSelectedText(shelfId: id)
+            }
+        }
+        controller.onMergeDrag = { [weak self] targetID in
+            guard let self else { return false }
+            var merged = false
+            self.handleLateEvent(shelfId: id) {
+                merged = self.mergeTextByDrag(shelfId: id, targetID: targetID)
+            }
+            return merged
+        }
+        controller.onCanMergeSelection = { [weak self] in
+            self?.canMergeSelectedText(shelfId: id) ?? false
+        }
+        controller.onDisplayModeChange = { [weak self] mode in
+            self?.setDisplayMode(mode)
+        }
         controller.onSimulateReceive = { [weak self] in
             self?.handleLateEvent(shelfId: id) {
                 _ = self?.simulateReceiveContent(shelfId: id)
@@ -372,7 +605,7 @@ final class ShelfManager {
     private func refreshWindow(shelfId: ShelfID) {
         guard let shelf = store.shelf(id: shelfId),
               let window = windows[shelfId] else { return }
-        window.apply(shelf: shelf)
+        window.apply(shelf: shelf, displayMode: settings.displayMode)
     }
 
     private func commitManagedReferences(for items: [ShelfItem], shelfID: ShelfID) {
