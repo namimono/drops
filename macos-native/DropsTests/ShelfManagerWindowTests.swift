@@ -55,7 +55,11 @@ final class ShelfManagerWindowTests: XCTestCase {
         XCTAssertTrue(shelf?.presentation == .collapsed || shelf?.presentation == .expanded)
         XCTAssertEqual(shelf?.lifecycle, .persistent)
 
-        let expected = ShelfWindowController.size(for: shelf!.presentation)
+        let expected = ShelfWindowController.size(
+            for: shelf!.presentation,
+            itemCount: shelf!.items.count,
+            displayMode: manager.displayMode
+        )
         let frame = manager.windowFrame(shelfId: id)
         XCTAssertNotNil(frame)
         XCTAssertEqual(frame!.size.width, expected.width, accuracy: 0.5)
@@ -82,7 +86,12 @@ final class ShelfManagerWindowTests: XCTestCase {
 
         manager.toggleExpand(shelfId: id)
         XCTAssertEqual(manager.shelf(id: id)?.presentation, .expanded)
-        let expanded = ShelfWindowController.size(for: .expanded)
+        let itemCount = manager.shelf(id: id)?.items.count ?? 0
+        let expanded = ShelfWindowController.size(
+            for: .expanded,
+            itemCount: itemCount,
+            displayMode: manager.displayMode
+        )
         let expandedReady = expectation(description: "expanded frame after animation")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             let frame = manager.windowFrame(shelfId: id)
@@ -92,6 +101,23 @@ final class ShelfManagerWindowTests: XCTestCase {
         }
         wait(for: [expandedReady], timeout: 1.5)
         manager.closeAll()
+    }
+
+    func testExpandedSizeGrowsWithItemCountAndCapsAtMax() {
+        let one = ShelfWindowController.expandedSize(itemCount: 1, displayMode: .grid)
+        let six = ShelfWindowController.expandedSize(itemCount: 6, displayMode: .grid)
+        let many = ShelfWindowController.expandedSize(itemCount: 60, displayMode: .grid)
+
+        XCTAssertEqual(one.width, 320, accuracy: 0.5)
+        XCTAssertEqual(one.height, 240, accuracy: 0.5)
+        XCTAssertGreaterThan(six.height, one.height)
+        XCTAssertEqual(many.height, 434, accuracy: 0.5)
+        XCTAssertLessThanOrEqual(many.height, 434)
+
+        let listFew = ShelfWindowController.expandedSize(itemCount: 2, displayMode: .list)
+        let listMany = ShelfWindowController.expandedSize(itemCount: 40, displayMode: .list)
+        XCTAssertEqual(listFew.height, 240, accuracy: 0.5)
+        XCTAssertEqual(listMany.height, 434, accuracy: 0.5)
     }
 
     func testPreemptedDragClosesOrphanTransientWindow() {

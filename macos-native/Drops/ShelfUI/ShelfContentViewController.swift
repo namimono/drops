@@ -1,4 +1,5 @@
 import AppKit
+import QuickLookUI
 
 /// Empty / collapsed / expanded content with Stage 2 drag + Stage 3 browse/actions.
 @MainActor
@@ -20,21 +21,23 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     var onDisplayModeChange: ((ShelfDisplayMode) -> Void)?
     /// Debug hook retained for Stage 1 demo menu.
     var onSimulateReceive: (() -> Void)?
+    /// Activate Drops so Space preview is not delivered to Finder.
+    var onClaimKeyFocus: (() -> Void)?
 
-    private let titleLabel = NSTextField(labelWithString: "")
-    private let statusLabel = NSTextField(labelWithString: "")
     private let emptyLabel = NSTextField(wrappingLabelWithString: "")
-    private let expandButton = NSButton(title: "Expand", target: nil, action: nil)
-    private let collapseButton = NSButton(title: "Collapse", target: nil, action: nil)
-    private let closeButton = NSButton(title: "Close", target: nil, action: nil)
-    private let gridModeButton = NSButton(title: "Grid", target: nil, action: nil)
-    private let listModeButton = NSButton(title: "List", target: nil, action: nil)
+    private let overlayCloseButton = NSButton(title: "", target: nil, action: nil)
+    private let detailBackButton = NSButton(title: "", target: nil, action: nil)
+    private let gridModeButton = NSButton(title: "", target: nil, action: nil)
+    private let listModeButton = NSButton(title: "", target: nil, action: nil)
+    private let detailTitleLabel = NSTextField(labelWithString: "")
+    private let detailSubtitleLabel = NSTextField(labelWithString: "")
+    private let enterDetailsButton = NSButton(title: "", target: nil, action: nil)
+    private let overlayGrabber = NSView()
 
     private let scrollView = NSScrollView()
-    private let tableView = NSTableView()
+    private var tableView: NSTableView!
     private var collectionView: NSCollectionView!
     private let collapsedStackView = CollapsedStackView()
-    private let stackDragHandle = CollapsedStackDragButton(title: "Drag all", target: nil, action: nil)
     private var languageObserver: NSObjectProtocol?
 
     private var shelfID: ShelfID?
@@ -62,28 +65,30 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         view = root
         root.registerForDraggedTypes(PasteboardMaterializer.registeredDragTypes)
 
-        titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
-        titleLabel.textColor = .labelColor
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-
-        statusLabel.font = .systemFont(ofSize: 11)
-        statusLabel.textColor = .secondaryLabelColor
-        statusLabel.translatesAutoresizingMaskIntoConstraints = false
-
         emptyLabel.font = .systemFont(ofSize: 12)
-        emptyLabel.textColor = .labelColor
+        emptyLabel.textColor = .secondaryLabelColor
         emptyLabel.alignment = .center
         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        configure(button: closeButton, action: #selector(closeTapped))
-        configure(button: expandButton, action: #selector(expandTapped))
-        configure(button: collapseButton, action: #selector(collapseTapped))
-        configure(button: gridModeButton, action: #selector(gridModeTapped))
-        configure(button: listModeButton, action: #selector(listModeTapped))
-        configure(button: stackDragHandle, action: nil)
-        stackDragHandle.onBeginDrag = { [weak self] event in
-            self?.beginCollapsedStackDrag(with: event)
-        }
+        detailTitleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        detailTitleLabel.textColor = .labelColor
+        detailTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        detailSubtitleLabel.font = .systemFont(ofSize: 10)
+        detailSubtitleLabel.textColor = .secondaryLabelColor
+        detailSubtitleLabel.lineBreakMode = .byTruncatingTail
+        detailSubtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        configureRoundIcon(button: overlayCloseButton, symbolName: "xmark", action: #selector(closeTapped))
+        configureRoundIcon(button: detailBackButton, symbolName: "chevron.left", action: #selector(collapseTapped))
+        configureRoundIcon(button: gridModeButton, symbolName: "square.grid.2x2", action: #selector(gridModeTapped))
+        configureRoundIcon(button: listModeButton, symbolName: "list.bullet", action: #selector(listModeTapped))
+        configureEnterDetailsButton()
+
+        overlayGrabber.wantsLayer = true
+        overlayGrabber.layer?.cornerRadius = 2
+        overlayGrabber.layer?.backgroundColor = NSColor.secondaryLabelColor.withAlphaComponent(0.5).cgColor
+        overlayGrabber.translatesAutoresizingMaskIntoConstraints = false
+
         collapsedStackView.translatesAutoresizingMaskIntoConstraints = false
         collapsedStackView.onBeginDrag = { [weak self] event in
             self?.beginCollapsedStackDrag(with: event)
@@ -105,53 +110,65 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
 
         let modeRow = NSStackView(views: [gridModeButton, listModeButton])
         modeRow.orientation = .horizontal
-        modeRow.spacing = 4
+        modeRow.spacing = 6
         modeRow.translatesAutoresizingMaskIntoConstraints = false
 
-        let buttonRow = NSStackView(views: [expandButton, collapseButton, stackDragHandle, modeRow])
-        buttonRow.orientation = .horizontal
-        buttonRow.spacing = 8
-        buttonRow.translatesAutoresizingMaskIntoConstraints = false
-
-        root.addSubview(titleLabel)
-        root.addSubview(closeButton)
-        root.addSubview(statusLabel)
+        root.addSubview(overlayGrabber)
+        root.addSubview(overlayCloseButton)
+        root.addSubview(detailBackButton)
+        root.addSubview(detailTitleLabel)
+        root.addSubview(detailSubtitleLabel)
+        root.addSubview(modeRow)
         root.addSubview(emptyLabel)
         root.addSubview(scrollView)
         root.addSubview(collapsedStackView)
-        root.addSubview(buttonRow)
+        root.addSubview(enterDetailsButton)
 
         NSLayoutConstraint.activate([
-            titleLabel.topAnchor.constraint(equalTo: root.topAnchor, constant: 14),
-            titleLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: closeButton.leadingAnchor, constant: -8),
+            overlayGrabber.topAnchor.constraint(equalTo: root.topAnchor, constant: 5),
+            overlayGrabber.centerXAnchor.constraint(equalTo: root.centerXAnchor),
+            overlayGrabber.widthAnchor.constraint(equalToConstant: 35),
+            overlayGrabber.heightAnchor.constraint(equalToConstant: 4),
 
-            closeButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
-            closeButton.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
+            overlayCloseButton.topAnchor.constraint(equalTo: root.topAnchor, constant: 7),
+            overlayCloseButton.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 7),
+            overlayCloseButton.widthAnchor.constraint(equalToConstant: 32),
+            overlayCloseButton.heightAnchor.constraint(equalToConstant: 32),
 
-            statusLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
-            statusLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            statusLabel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
+            detailBackButton.topAnchor.constraint(equalTo: root.topAnchor, constant: 7),
+            detailBackButton.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 7),
+            detailBackButton.widthAnchor.constraint(equalToConstant: 32),
+            detailBackButton.heightAnchor.constraint(equalToConstant: 32),
+
+            detailTitleLabel.topAnchor.constraint(equalTo: root.topAnchor, constant: 9),
+            detailTitleLabel.leadingAnchor.constraint(equalTo: detailBackButton.trailingAnchor, constant: 7),
+            detailTitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: modeRow.leadingAnchor, constant: -8),
+            detailSubtitleLabel.topAnchor.constraint(equalTo: detailTitleLabel.bottomAnchor, constant: 1),
+            detailSubtitleLabel.leadingAnchor.constraint(equalTo: detailTitleLabel.leadingAnchor),
+            detailSubtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: modeRow.leadingAnchor, constant: -8),
+
+            modeRow.centerYAnchor.constraint(equalTo: detailBackButton.centerYAnchor),
+            modeRow.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -10),
 
             emptyLabel.centerXAnchor.constraint(equalTo: root.centerXAnchor),
-            emptyLabel.centerYAnchor.constraint(equalTo: root.centerYAnchor, constant: -8),
+            emptyLabel.centerYAnchor.constraint(equalTo: root.centerYAnchor, constant: 2),
             emptyLabel.leadingAnchor.constraint(greaterThanOrEqualTo: root.leadingAnchor, constant: 20),
             emptyLabel.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -20),
 
-            scrollView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
+            scrollView.topAnchor.constraint(equalTo: detailBackButton.bottomAnchor, constant: 10),
             scrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 8),
             scrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -8),
-            scrollView.bottomAnchor.constraint(equalTo: buttonRow.topAnchor, constant: -8),
+            scrollView.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -10),
 
-            collapsedStackView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
-            collapsedStackView.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
-            collapsedStackView.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
-            collapsedStackView.bottomAnchor.constraint(equalTo: buttonRow.topAnchor, constant: -8),
-            collapsedStackView.heightAnchor.constraint(greaterThanOrEqualToConstant: 64),
+            collapsedStackView.topAnchor.constraint(equalTo: overlayCloseButton.bottomAnchor, constant: 9),
+            collapsedStackView.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 12),
+            collapsedStackView.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
+            collapsedStackView.bottomAnchor.constraint(equalTo: enterDetailsButton.topAnchor, constant: -7),
 
-            buttonRow.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
-            buttonRow.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -14),
-            buttonRow.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -14),
+            enterDetailsButton.centerXAnchor.constraint(equalTo: root.centerXAnchor),
+            enterDetailsButton.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -11),
+            enterDetailsButton.heightAnchor.constraint(equalToConstant: 28),
+            enterDetailsButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 58),
         ])
 
         languageObserver = NotificationCenter.default.addObserver(
@@ -159,8 +176,10 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.applyLocalizedChrome()
-            self?.refreshLabels()
+            Task { @MainActor [weak self] in
+                self?.applyLocalizedChrome()
+                self?.refreshLabels()
+            }
         }
     }
 
@@ -196,6 +215,25 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         refreshLabels()
         reloadContentViews()
         syncSelectionToViews()
+    }
+
+    /// Lightweight selection sync used after click so cells are not reloaded/resized.
+    func syncSelection(from shelf: Shelf) {
+        selection = shelf.selection
+        if let anchor = selectionAnchor, items.contains(where: { $0.id == anchor }) {
+            // keep
+        } else if let first = shelf.orderedSelection().first {
+            selectionAnchor = first.id
+        } else {
+            selectionAnchor = nil
+        }
+        syncSelectionToViews()
+    }
+
+    /// Recompute grid itemSize when the window resizes without a full content reload.
+    func updateExpandedGridLayoutIfNeeded() {
+        guard presentation == .expanded, displayMode == .grid else { return }
+        applyGridItemSize()
     }
 
     /// Test seam for selection-anchor stability across `apply(shelf:)`.
@@ -301,7 +339,9 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     func handleKeyDown(_ event: NSEvent) -> Bool {
         guard !items.isEmpty else { return false }
         switch event.keyCode {
-        case 49: // Space
+        case 49: // Space — claim focus so Finder does not receive the preview shortcut
+            onClaimKeyFocus?()
+            prepareQuickLookURLsFromSelection()
             onPreviewSelection?()
             return true
         case 51, 117: // Delete / Forward Delete
@@ -318,12 +358,46 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         }
     }
 
+    /// QLPreviewPanel walks the responder chain; accept only when we have local files to show.
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+        canControlQuickLookPanel
+    }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        prepareQuickLookURLsFromSelection()
+        QuickLookPreviewController.shared.attach(to: panel)
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        QuickLookPreviewController.shared.detach(from: panel)
+    }
+
+    private var canControlQuickLookPanel: Bool {
+        let ordered = items.filter { selection.contains($0.id) }
+        guard !ordered.isEmpty else { return QuickLookPreviewController.shared.hasPreviewItems }
+        if case .quickLookLocalFiles = ShelfPreviewDecision.decide(for: ordered) {
+            return true
+        }
+        return false
+    }
+
+    private func prepareQuickLookURLsFromSelection() {
+        let ordered = items.filter { selection.contains($0.id) }
+        guard !ordered.isEmpty else { return }
+        if case .quickLookLocalFiles(let urls) = ShelfPreviewDecision.decide(for: ordered) {
+            QuickLookPreviewController.shared.setPreviewURLs(urls)
+        }
+    }
+
     // MARK: - Private
 
     private func configureTable() {
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
         column.title = "Items"
         column.width = 360
+        let keyTable = KeyHandlingTableView()
+        keyTable.keyHandler = self
+        tableView = keyTable
         tableView.addTableColumn(column)
         tableView.headerView = nil
         tableView.delegate = self
@@ -332,6 +406,7 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         tableView.backgroundColor = .clear
         tableView.selectionHighlightStyle = .regular
         tableView.allowsMultipleSelection = true
+        tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         tableView.setDraggingSourceOperationMask([.copy, .move], forLocal: false)
         tableView.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
         tableView.target = self
@@ -343,12 +418,14 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
 
     private func configureCollection() {
         let layout = NSCollectionViewFlowLayout()
-        layout.itemSize = NSSize(width: 120, height: 110)
+        layout.itemSize = NSSize(width: 90, height: ShelfWindowController.gridItemHeight)
         layout.minimumInteritemSpacing = 8
         layout.minimumLineSpacing = 8
         layout.sectionInset = NSEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
 
-        collectionView = NSCollectionView()
+        let keyCollection = KeyHandlingCollectionView()
+        keyCollection.keyHandler = self
+        collectionView = keyCollection
         collectionView.collectionViewLayout = layout
         collectionView.dataSource = self
         collectionView.delegate = self
@@ -366,65 +443,56 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     }
 
     private func applyLocalizedChrome() {
-        expandButton.title = L10n.expand
-        collapseButton.title = L10n.collapse
-        closeButton.title = L10n.close
-        gridModeButton.title = L10n.grid
-        listModeButton.title = L10n.list
-        stackDragHandle.title = L10n.dragAll
         emptyLabel.stringValue = L10n.emptyDrop
 
-        expandButton.setAccessibilityLabel(L10n.expand)
-        collapseButton.setAccessibilityLabel(L10n.collapse)
-        closeButton.setAccessibilityLabel(L10n.close)
+        overlayCloseButton.setAccessibilityLabel(L10n.close)
+        detailBackButton.setAccessibilityLabel(L10n.collapse)
         gridModeButton.setAccessibilityLabel(L10n.grid)
         listModeButton.setAccessibilityLabel(L10n.list)
-        stackDragHandle.setAccessibilityLabel(L10n.dragAll)
         tableView.setAccessibilityLabel(L10n.a11yItemList)
         collectionView?.setAccessibilityLabel(L10n.a11yItemGrid)
         view.setAccessibilityLabel(L10n.a11yShelfWindow)
     }
 
     private func refreshLabels() {
-        let shortID = shelfID.map { String($0.rawValue.uuidString.prefix(8)) } ?? "—"
-        titleLabel.stringValue = L10n.shelfTitle(shortID: shortID)
-        statusLabel.stringValue = L10n.shelfStatus(
-            lifecycle: lifecycle.rawValue,
-            presentation: presentation.rawValue,
-            count: items.count
-        )
-
         let hasItems = !items.isEmpty
-        let isExpanded = presentation == .expanded
-        let isCollapsed = presentation == .collapsed
-        stackDragHandle.isHidden = !isCollapsed || !hasItems
-        gridModeButton.isHidden = !isExpanded
-        listModeButton.isHidden = !isExpanded
+        let isDetail = presentation == .expanded
+        let itemCount = items.count
+        detailTitleLabel.stringValue = detailTitle(for: itemCount)
+        detailSubtitleLabel.stringValue = isDetail ? detailSubtitle : ""
+        enterDetailsButton.title = "\(detailTitle(for: itemCount))  ›"
+
+        overlayGrabber.isHidden = isDetail
+        overlayCloseButton.isHidden = isDetail
+        detailBackButton.isHidden = !isDetail
+        detailTitleLabel.isHidden = !isDetail
+        detailSubtitleLabel.isHidden = !isDetail
+        gridModeButton.isHidden = !isDetail
+        listModeButton.isHidden = !isDetail
         gridModeButton.state = displayMode == .grid ? .on : .off
         listModeButton.state = displayMode == .list ? .on : .off
+        updateModeButtonAppearance(gridModeButton, selected: displayMode == .grid)
+        updateModeButtonAppearance(listModeButton, selected: displayMode == .list)
 
         switch presentation {
         case .empty:
-            expandButton.isEnabled = hasItems
-            collapseButton.isEnabled = false
             scrollView.isHidden = true
             collapsedStackView.isHidden = true
             emptyLabel.isHidden = false
+            enterDetailsButton.isHidden = true
         case .collapsed:
-            expandButton.isEnabled = true
-            collapseButton.isEnabled = false
             scrollView.isHidden = true
             collapsedStackView.isHidden = !hasItems
             emptyLabel.isHidden = hasItems
+            enterDetailsButton.isHidden = !hasItems
             if hasItems {
                 collapsedStackView.apply(items: items)
             }
         case .expanded:
-            expandButton.isEnabled = false
-            collapseButton.isEnabled = true
             scrollView.isHidden = false
             collapsedStackView.isHidden = true
             emptyLabel.isHidden = true
+            enterDetailsButton.isHidden = true
         }
     }
 
@@ -435,13 +503,7 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
             if scrollView.documentView !== collectionView {
                 scrollView.documentView = collectionView
             }
-            if let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
-                // PRD 5.3.2: at most 3 items per row in expanded grid.
-                let available = max(scrollView.bounds.width - 16, 280)
-                let spacing = layout.minimumInteritemSpacing
-                let width = floor((available - spacing * 2) / 3)
-                layout.itemSize = NSSize(width: width, height: width + 28)
-            }
+            applyGridItemSize()
             collectionView.reloadData()
         } else {
             if scrollView.documentView !== tableView {
@@ -450,6 +512,26 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
             tableView.reloadData()
         }
     }
+
+    /// PRD 5.3.2: at most 3 items per row; height stays content-tight (not width-derived).
+    private func applyGridItemSize() {
+        guard let layout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout else {
+            return
+        }
+        let horizontalInset = layout.sectionInset.left + layout.sectionInset.right
+        let containerWidth = scrollView.bounds.width > 1
+            ? scrollView.bounds.width
+            : (view.bounds.width > 1 ? max(view.bounds.width - 16, 1) : expandedFallbackWidth)
+        let available = max(containerWidth - horizontalInset, 60)
+        let spacing = layout.minimumInteritemSpacing
+        let width = floor((available - spacing * 2) / 3)
+        let next = NSSize(width: max(width, 60), height: ShelfWindowController.gridItemHeight)
+        guard layout.itemSize != next else { return }
+        layout.itemSize = next
+        layout.invalidateLayout()
+    }
+
+    private var expandedFallbackWidth: CGFloat { 304 }
 
     private func syncSelectionToViews() {
         if scrollView.documentView === tableView {
@@ -475,12 +557,55 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         return false
     }
 
-    private func configure(button: NSButton, action: Selector?) {
+    private func configureRoundIcon(button: NSButton, symbolName: String, action: Selector?) {
         button.bezelStyle = .inline
-        button.font = .systemFont(ofSize: 11, weight: .medium)
+        button.image = NSImage(
+            systemSymbolName: symbolName,
+            accessibilityDescription: nil
+        )
+        button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .semibold)
+        button.contentTintColor = .secondaryLabelColor
         button.target = self
         button.action = action
         button.translatesAutoresizingMaskIntoConstraints = false
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 16
+        button.layer?.cornerCurve = .continuous
+        button.layer?.backgroundColor = NSColor.quaternaryLabelColor.withAlphaComponent(0.6).cgColor
+    }
+
+    private func configureEnterDetailsButton() {
+        enterDetailsButton.bezelStyle = .inline
+        enterDetailsButton.font = .systemFont(ofSize: 11, weight: .medium)
+        enterDetailsButton.contentTintColor = .labelColor
+        enterDetailsButton.target = self
+        enterDetailsButton.action = #selector(expandTapped)
+        enterDetailsButton.translatesAutoresizingMaskIntoConstraints = false
+        enterDetailsButton.wantsLayer = true
+        enterDetailsButton.layer?.cornerRadius = 14
+        enterDetailsButton.layer?.cornerCurve = .continuous
+        enterDetailsButton.layer?.backgroundColor = NSColor.quaternaryLabelColor.withAlphaComponent(0.75).cgColor
+    }
+
+    private func updateModeButtonAppearance(_ button: NSButton, selected: Bool) {
+        button.contentTintColor = selected ? .labelColor : .secondaryLabelColor
+        button.layer?.backgroundColor = (selected
+            ? NSColor.tertiaryLabelColor.withAlphaComponent(0.7)
+            : NSColor.quaternaryLabelColor.withAlphaComponent(0.6)
+        ).cgColor
+    }
+
+    private func detailTitle(for count: Int) -> String {
+        if AppLocalization.effectiveLanguageCode == "zh-Hans" {
+            return "\(count) 项"
+        }
+        return "\(count) \(count == 1 ? "item" : "items")"
+    }
+
+    private var detailSubtitle: String {
+        AppLocalization.effectiveLanguageCode == "zh-Hans"
+            ? "右键文件可查看更多操作"
+            : "Right-click an item for actions"
     }
 
     private func modifiers(from flags: NSEvent.ModifierFlags) -> SelectionModifiers {
@@ -594,6 +719,7 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
 
     private func selectItem(at index: Int, modifiers mods: SelectionModifiers) {
         guard items.indices.contains(index) else { return }
+        onClaimKeyFocus?()
         let item = items[index]
         if mods != .range {
             selectionAnchor = item.id
@@ -872,6 +998,11 @@ private final class DropHostingView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    override func mouseDown(with event: NSEvent) {
+        owner?.onClaimKeyFocus?()
+        super.mouseDown(with: event)
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         owner?.drawDragHighlight(in: dirtyRect)
@@ -914,6 +1045,72 @@ private final class DropHostingView: NSView {
             return true
         }
         return super.performKeyEquivalent(with: event)
+    }
+
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+        owner?.acceptsPreviewPanelControl(panel) ?? false
+    }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        owner?.beginPreviewPanelControl(panel)
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        owner?.endPreviewPanelControl(panel)
+    }
+}
+
+/// Forwards Space / Delete / Escape while the grid holds first responder.
+private final class KeyHandlingCollectionView: NSCollectionView {
+    weak var keyHandler: ShelfContentViewController?
+
+    override func mouseDown(with event: NSEvent) {
+        keyHandler?.onClaimKeyFocus?()
+        super.mouseDown(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if keyHandler?.handleKeyDown(event) == true { return }
+        super.keyDown(with: event)
+    }
+
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+        keyHandler?.acceptsPreviewPanelControl(panel) ?? false
+    }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        keyHandler?.beginPreviewPanelControl(panel)
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        keyHandler?.endPreviewPanelControl(panel)
+    }
+}
+
+/// Forwards Space / Delete / Escape while the list holds first responder.
+private final class KeyHandlingTableView: NSTableView {
+    weak var keyHandler: ShelfContentViewController?
+
+    override func mouseDown(with event: NSEvent) {
+        keyHandler?.onClaimKeyFocus?()
+        super.mouseDown(with: event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if keyHandler?.handleKeyDown(event) == true { return }
+        super.keyDown(with: event)
+    }
+
+    override func acceptsPreviewPanelControl(_ panel: QLPreviewPanel!) -> Bool {
+        keyHandler?.acceptsPreviewPanelControl(panel) ?? false
+    }
+
+    override func beginPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        keyHandler?.beginPreviewPanelControl(panel)
+    }
+
+    override func endPreviewPanelControl(_ panel: QLPreviewPanel!) {
+        keyHandler?.endPreviewPanelControl(panel)
     }
 }
 

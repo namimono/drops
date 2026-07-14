@@ -213,7 +213,8 @@ final class ShelfManager {
               let shelf = store.shelf(id: shelfId),
               shelf.isActive else { return }
         shelf.applySelectionClick(itemID: itemID, modifiers: modifiers, anchorID: anchorID)
-        refreshWindow(shelfId: shelfId)
+        // Selection-only: full refresh would reload grid cells and jump itemSize.
+        windows[shelfId]?.syncSelection(from: shelf)
     }
 
     func handleDragOutEnded(
@@ -314,7 +315,12 @@ final class ShelfManager {
     func previewSelection(shelfId: ShelfID) -> Bool {
         guard let shelf = activeShelf(id: shelfId) else { return false }
         let ordered = shelf.orderedSelection()
-        return QuickLookPreviewController.shared.preview(orderedSelection: ordered) { [weak self] url in
+        return QuickLookPreviewController.shared.preview(
+            orderedSelection: ordered,
+            becomeActive: { [weak self] in
+                self?.windows[shelfId]?.claimKeyFocus()
+            }
+        ) { [weak self] url in
             do {
                 try self?.itemActions.open(
                     ShelfItem(

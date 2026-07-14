@@ -64,17 +64,53 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         return contentController.hasRegisteredDragTypes
     }
 
-    private static let emptySize = NSSize(width: 280, height: 220)
-    /// Same width as empty so Stage 1 skeleton controls fit; height marks collapsed.
-    private static let collapsedSize = NSSize(width: 280, height: 160)
-    private static let expandedSize = NSSize(width: 420, height: 360)
+    /// A small floating overlay that keeps the dropped stack within a single visual focus.
+    private static let emptySize = NSSize(width: 200, height: 208)
+    private static let collapsedSize = NSSize(width: 200, height: 208)
 
-    static func size(for presentation: ShelfPresentation) -> NSSize {
+    /// Expanded detail width stays fixed; height grows with item count between min and max.
+    private static let expandedWidth: CGFloat = 320
+    private static let expandedMinHeight: CGFloat = 240
+    private static let expandedMaxHeight: CGFloat = 434
+    private static let expandedHeaderHeight: CGFloat = 49
+    private static let expandedScrollVerticalInset: CGFloat = 20
+    private static let gridColumns = 3
+    static let gridItemHeight: CGFloat = 96
+    private static let gridLineSpacing: CGFloat = 8
+    private static let gridSectionVerticalInset: CGFloat = 8
+    private static let listRowHeight: CGFloat = 28
+
+    static func size(
+        for presentation: ShelfPresentation,
+        itemCount: Int = 0,
+        displayMode: ShelfDisplayMode = .grid
+    ) -> NSSize {
         switch presentation {
         case .empty: return emptySize
         case .collapsed: return collapsedSize
-        case .expanded: return expandedSize
+        case .expanded:
+            return expandedSize(itemCount: itemCount, displayMode: displayMode)
         }
+    }
+
+    /// Height grows with rows/items, clamped to `[expandedMinHeight, expandedMaxHeight]`.
+    static func expandedSize(itemCount: Int, displayMode: ShelfDisplayMode) -> NSSize {
+        let count = max(itemCount, 1)
+        let contentHeight: CGFloat
+        switch displayMode {
+        case .grid:
+            let rows = ceil(CGFloat(count) / CGFloat(gridColumns))
+            contentHeight = gridSectionVerticalInset
+                + rows * gridItemHeight
+                + max(0, rows - 1) * gridLineSpacing
+        case .list:
+            contentHeight = CGFloat(count) * listRowHeight
+        }
+        let height = min(
+            expandedMaxHeight,
+            max(expandedMinHeight, expandedHeaderHeight + expandedScrollVerticalInset + contentHeight)
+        )
+        return NSSize(width: expandedWidth, height: height)
     }
 
     init(shelfID: ShelfID, openSource: ShelfOpenSource) {
@@ -118,6 +154,18 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         contentController.onCanMergeSelection = { [weak self] in self?.onCanMergeSelection?() ?? false }
         contentController.onDisplayModeChange = { [weak self] mode in self?.onDisplayModeChange?(mode) }
         contentController.onSimulateReceive = { [weak self] in self?.onSimulateReceive?() }
+        contentController.onClaimKeyFocus = { [weak self] in self?.claimKeyFocus() }
+    }
+
+    /// Activate Drops and make this shelf key so keyboard / Quick Look stay in-process.
+    func claimKeyFocus() {
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKey()
+        if panel.firstResponder == nil
+            || panel.firstResponder === panel
+            || panel.firstResponder === panel.contentView {
+            panel.makeFirstResponder(contentController.view)
+        }
     }
 
     @available(*, unavailable)
@@ -152,8 +200,30 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     var animatesPresentationChanges = true
 
     func apply(shelf: Shelf, displayMode: ShelfDisplayMode = .grid) {
-        contentController.apply(shelf: shelf, displayMode: displayMode)
-        resize(for: shelf.presentation, animated: animatesPresentationChanges)
+        let size = Self.size(
+            for: shelf.presentation,
+            itemCount: shelf.items.count,
+            displayMode: displayMode
+        )
+
+        switch shelf.presentation {
+        case .expanded:
+            // Size first so grid itemSize uses final scrollView bounds (avoids click-to-grow jump).
+            resize(to: size, animated: animatesPresentationChanges)
+            panel.layoutIfNeeded()
+            contentController.apply(shelf: shelf, displayMode: displayMode)
+            settleFrame(to: size)
+        case .empty, .collapsed:
+            // Apply chrome first so expanded Auto Layout cannot inflate the smaller frame.
+            contentController.apply(shelf: shelf, displayMode: displayMode)
+            resize(to: size, animated: animatesPresentationChanges)
+            settleFrame(to: size)
+        }
+    }
+
+    /// Selection-only refresh: avoid reloadData so grid cells do not jump size on click.
+    func syncSelection(from shelf: Shelf) {
+        contentController.syncSelection(from: shelf)
     }
 
     func windowWillClose(_ notification: Notification) {
@@ -162,6 +232,7 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidResize(_ notification: Notification) {
         refreshRoundedWindowChrome()
+        contentController.updateExpandedGridLayoutIfNeeded()
     }
 
     // MARK: - Private
@@ -245,9 +316,7 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         panel.invalidateShadow()
     }
 
-    private func resize(for presentation: ShelfPresentation, animated: Bool) {
-        let size = Self.size(for: presentation)
-
+    private func resize(to size: NSSize, animated: Bool) {
         var frame = panel.frame
         let origin = ShelfWindowGeometry.clampedOrigin(
             NSPoint(x: frame.midX - size.width / 2, y: frame.midY - size.height / 2),
@@ -257,5 +326,12 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         frame = NSRect(origin: origin, size: size)
         panel.setFrame(frame, display: true, animate: animated)
         refreshRoundedWindowChrome()
+    }
+
+    /// Re-assert domain-driven size if Auto Layout nudged the panel during content updates.
+    private func settleFrame(to size: NSSize) {
+        guard abs(panel.frame.width - size.width) > 0.5
+            || abs(panel.frame.height - size.height) > 0.5 else { return }
+        resize(to: size, animated: false)
     }
 }
