@@ -2,9 +2,9 @@
 
 > 文档版本：V1.2<br>
 > 制定日期：2026-07-13<br>
-> 更新日期：2026-07-14<br>
+> 更新日期：2026-07-15<br>
 > 需求基线：[Drops-PRD.md](../Drops-PRD.md)<br>
-> 方案状态：产品范围已确认（不含图片/视频压缩）；阶段 0–2 已完成；阶段 3 代码已实现、待手工验收<br>
+> 方案状态：产品范围已确认（不含图片/视频压缩）；阶段 0–3 已完成；下一阶段为发布准备<br>
 > 开发进度：[development-progress.md](development-progress.md)<br>
 > 阶段 0 审查：[stage-0-review-issues.md](stage-0-review-issues.md)<br>
 > 阶段 1 审查：[stage-1-review-issues.md](stage-1-review-issues.md)

@@ -1,8 +1,10 @@
 # 阶段 3：原生交互完善
 
-> 状态：代码已实现，待手工验收（本地化 / 收起堆 / a11y / 阶段 4 接入点规划已落地；见 [手工清单](./stage-3-manual-acceptance.md)）  
+> 状态：**已完成**（S3-01～S3-14 全部通过；见 [手工清单](./stage-3-manual-acceptance.md) · [开发进度](./development-progress.md)）  
+> 完成日期：2026-07-15  
 > 上级文档：[macOS 原生方案](README.md)  
-> 前置阶段：[阶段 2：拖放与剪贴板主链路](stage-2-drag-drop-and-pasteboard.md)
+> 前置阶段：[阶段 2：拖放与剪贴板主链路](stage-2-drag-drop-and-pasteboard.md)  
+> 下一阶段：[阶段 4：发布准备](stage-4-release-readiness.md)
 
 ## 1. 阶段定位
 
