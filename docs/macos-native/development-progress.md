@@ -74,7 +74,7 @@
 | 手工反馈修复 | 合并成功后拖影先回弹再消失；零尺寸拖影导致崩溃；就绪提示呼吸缩放 | **代码已实现，待手工复验** | 达到悬停就绪时关闭 drag-image 回位，并立即隐藏被拖源项；松手后直接 `replaceItems`，去掉参与项 0.28s 放大—回缩（那是「回原位→抖动→消失」的主因）；结果项仍轻脉冲。合并相关单测 14/14（2026-07-15）。 |
 | 手工反馈修复 | 禁用架内重排后拖放合并失效 | **已修复，待手工复验** | 合并源改为拖出的 `dragOutItemIDs`，不依赖可能为空的选区；`testDragMergeUsesSourceIDsEvenWhenSelectionEmpty` 通过 |
 | 手工反馈修复 | 粘贴后旧首项仍被选中；框内拖放误触发“排序” | **代码已实现，待手工复验** | `insertItems` 仅选中新插入项；拒绝同源架内 drop 避免重插入前移；领域单测通过；PRD 5.4.1 已同步 |
-| 手工反馈修复 | 详情右上角网格/列表切换图标难辨认 | **代码已实现，待手工复验** | 独立 `configureModeIcon`：`square.grid.2x2` / `list.bullet` 加大至 15pt medium、深色描边；仅选中态浅灰圆角底，未选中无背景 |
+| 手工反馈修复 | 详情右上角网格/列表切换图标难辨认 | **代码已实现，待手工复验** | 独立 `configureModeIcon`：`square.grid.2x2` / `list.bullet` 加大至 15pt medium、深色描边；仅选中态浅灰圆角底（`labelColor` 8% alpha），未选中无背景；切换时内容区淡入淡出 + 选中底过渡 |
 | 自动化 | 合并相关聚焦单测 | **通过** | `TextMergeServiceTests` + `ShelfItemDomainTests` + `ShelfStage3InteractionTests`（15/15，2026-07-14） |
 | 自动化 | 展开尺寸随数量增长并封顶 | **通过** | `testExpandedSizeGrowsWithItemCountAndCapsAtMax` |
 | 自动化 | 插入后选区仅为新项 | **通过** | `testInsertedItemsBecomeSoleSelection` |
@@ -92,6 +92,7 @@
 - [x] 手工反馈：粘贴仅选中新项；禁用架内拖放重排（待手工复验）。
 - [x] 手工反馈：合并成功时源项立即消失（无回原位抖动），结果项轻脉冲（待手工复验）。
 - [x] 手工反馈：详情右上角网格/列表切换图标可读性（代码已修，待手工复验）。
+- [x] 手工反馈：网格/列表切换交叉淡入淡出（代码已修，待手工复验）。
 - [ ] 按 [手工验收清单](./stage-3-manual-acceptance.md) 完成勾选并记录问题。
 
 ### P1 · 治理、性能或维护性
@@ -105,7 +106,7 @@
 
 | 验收项 | 状态 |
 |---|---|
-| S3-01 网格/列表与图标缩略图 | **代码已实现，待手工验证**（右上角切换图标已加大并区分选中底） |
+| S3-01 网格/列表与图标缩略图 | **代码已实现，待手工验证**（右上角切换图标已加大；选中浅灰底；切换交叉淡入淡出） |
 | S3-02 选择一致性 | **代码已实现，待手工验证**（选区同步不再整窗 reload；粘贴/拖入仅选中新项） |
 | S3-03 打开 / 定位 / 失败反馈 | **代码已实现，待手工验证** |
 | S3-04 混选预览 | **已验证（自动化决策）**；Space→QL 已修（焦点转发 + 防 Finder 抢预览），**待手工** |
@@ -128,12 +129,17 @@
 
 ## 9. 变更文件速查
 
-**本轮（合并成功去掉回原位抖动）**
+**本轮（网格/列表切换动画）**
+
+- `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`（展开态切换时内容区淡出→换 documentView→淡入；模式按钮选中底 0.2s 过渡）
+- `docs/macos-native/development-progress.md`
+
+**上轮（合并成功去掉回原位抖动）**
 
 - `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`（就绪即隐藏源项；松手直接 `replaceItems`；移除参与项脉冲）
 - `docs/macos-native/development-progress.md`
 
-**上轮（合并成功动画 / 取消拖影回弹）**
+**更早（合并成功动画 / 取消拖影回弹）**
 
 - `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`（抑制拖影回弹且不再设置非法零尺寸 frame；参与项/结果缩放脉冲；菜单合并结果脉冲）
 - `docs/macos-native/development-progress.md`

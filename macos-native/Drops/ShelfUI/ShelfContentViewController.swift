@@ -50,6 +50,8 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     private var selection: Set<ShelfItemID> = []
     private var selectionAnchor: ShelfItemID?
     private var displayMode: ShelfDisplayMode = .grid
+    /// Cancels in-flight grid↔list crossfades when a newer apply arrives.
+    private var displayModeTransitionToken = 0
     private var isReceivingDrag = false
     private var dragOutItemIDs: Set<ShelfItemID> = []
 
@@ -213,6 +215,8 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     }
 
     func apply(shelf: Shelf, displayMode: ShelfDisplayMode = .grid) {
+        let previousMode = self.displayMode
+        let previousPresentation = presentation
         shelfID = shelf.id
         presentation = shelf.presentation
         lifecycle = shelf.lifecycle
@@ -227,9 +231,19 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         } else {
             selectionAnchor = nil
         }
-        refreshLabels()
-        reloadContentViews()
-        syncSelectionToViews()
+        let animateModeSwitch =
+            previousPresentation == .expanded
+            && shelf.presentation == .expanded
+            && previousMode != displayMode
+        refreshLabels(animateModeButtons: animateModeSwitch)
+        if animateModeSwitch {
+            reloadContentViews(animated: true) { [weak self] in
+                self?.syncSelectionToViews()
+            }
+        } else {
+            reloadContentViews(animated: false)
+            syncSelectionToViews()
+        }
     }
 
     /// Lightweight selection sync used after click so cells are not reloaded/resized.
@@ -488,7 +502,7 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         refreshMergeFeedback(animated: false)
     }
 
-    private func refreshLabels() {
+    private func refreshLabels(animateModeButtons: Bool = false) {
         let hasItems = !items.isEmpty
         let isDetail = presentation == .expanded
         let itemCount = items.count
@@ -505,8 +519,8 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         listModeButton.isHidden = !isDetail
         gridModeButton.state = displayMode == .grid ? .on : .off
         listModeButton.state = displayMode == .list ? .on : .off
-        updateModeButtonAppearance(gridModeButton, selected: displayMode == .grid)
-        updateModeButtonAppearance(listModeButton, selected: displayMode == .list)
+        updateModeButtonAppearance(gridModeButton, selected: displayMode == .grid, animated: animateModeButtons)
+        updateModeButtonAppearance(listModeButton, selected: displayMode == .list, animated: animateModeButtons)
 
         switch presentation {
         case .empty:
@@ -530,21 +544,57 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         }
     }
 
-    private func reloadContentViews() {
-        guard presentation == .expanded else { return }
-        let useGrid = displayMode == .grid
-        if useGrid {
-            if scrollView.documentView !== collectionView {
-                scrollView.documentView = collectionView
-            }
-            applyGridItemSize()
-            collectionView.reloadData()
-        } else {
-            if scrollView.documentView !== tableView {
-                scrollView.documentView = tableView
-            }
-            tableView.reloadData()
+    private func reloadContentViews(animated: Bool = false, completion: (() -> Void)? = nil) {
+        guard presentation == .expanded else {
+            completion?()
+            return
         }
+
+        let installCurrentMode: () -> Void = { [weak self] in
+            guard let self else { return }
+            let useGrid = self.displayMode == .grid
+            if useGrid {
+                if self.scrollView.documentView !== self.collectionView {
+                    self.scrollView.documentView = self.collectionView
+                }
+                self.applyGridItemSize()
+                self.collectionView.reloadData()
+            } else {
+                if self.scrollView.documentView !== self.tableView {
+                    self.scrollView.documentView = self.tableView
+                }
+                self.tableView.reloadData()
+            }
+        }
+
+        guard animated else {
+            displayModeTransitionToken += 1
+            scrollView.alphaValue = 1
+            installCurrentMode()
+            completion?()
+            return
+        }
+
+        displayModeTransitionToken += 1
+        let token = displayModeTransitionToken
+        scrollView.wantsLayer = true
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.12
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            scrollView.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            guard let self, token == self.displayModeTransitionToken else { return }
+            installCurrentMode()
+            self.scrollView.alphaValue = 0
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.18
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                self.scrollView.animator().alphaValue = 1
+            }, completionHandler: {
+                guard token == self.displayModeTransitionToken else { return }
+                completion?()
+            })
+        })
     }
 
     /// PRD 5.3.2: at most 3 items per row; height stays content-tight (not width-derived).
@@ -661,11 +711,23 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         enterDetailsButton.layer?.backgroundColor = NSColor.quaternaryLabelColor.withAlphaComponent(0.75).cgColor
     }
 
-    private func updateModeButtonAppearance(_ button: NSButton, selected: Bool) {
+    private func updateModeButtonAppearance(_ button: NSButton, selected: Bool, animated: Bool = false) {
         button.contentTintColor = .labelColor
-        button.layer?.backgroundColor = selected
-            ? NSColor.quaternaryLabelColor.withAlphaComponent(0.85).cgColor
+        // Light fill only — quaternaryLabel @ high alpha reads almost black on light chrome.
+        let color = selected
+            ? NSColor.labelColor.withAlphaComponent(0.08).cgColor
             : NSColor.clear.cgColor
+        guard animated, let layer = button.layer else {
+            button.layer?.backgroundColor = color
+            return
+        }
+        let animation = CABasicAnimation(keyPath: "backgroundColor")
+        animation.fromValue = layer.presentation()?.backgroundColor ?? layer.backgroundColor
+        animation.toValue = color
+        animation.duration = 0.2
+        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(animation, forKey: "modeSelectionBackground")
+        layer.backgroundColor = color
     }
 
     private func detailTitle(for count: Int) -> String {
