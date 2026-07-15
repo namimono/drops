@@ -137,4 +137,49 @@ final class ShelfStage3InteractionTests: XCTestCase {
         shelf.applySelectionClick(itemID: ids[2], modifiers: .toggle, anchorID: ids[0])
         XCTAssertEqual(shelf.selection, [ids[0], ids[2]])
     }
+
+    /// Drag-merge must use dragged item IDs, not selection (selection is often empty mid-drag).
+    func testDragMergeUsesSourceIDsEvenWhenSelectionEmpty() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("drops-merge-src-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let store = try ManagedTemporaryFileStore(retentionDays: 30, rootURL: root)
+        let manager = ShelfManager(temporaryStore: store)
+        let shelfID = manager.createShelf(source: .menu, nearMouse: false)!
+
+        var drafts: [ShelfItemDraft] = []
+        for name in ["target.txt", "source.txt"] {
+            let created = try store.createTemporaryFile(
+                named: name,
+                data: Data("content-\(name)".utf8),
+                referencedBy: shelfID
+            )
+            drafts.append(
+                .managed(
+                    url: created.url,
+                    displayName: name,
+                    kind: .text,
+                    temporaryFileID: created.record.id
+                )
+            )
+        }
+        XCTAssertTrue(manager.acceptContent(shelfId: shelfID, drafts: drafts))
+        let shelf = manager.shelf(id: shelfID)!
+        let target = shelf.items.first { $0.displayName == "target.txt" }!
+        let source = shelf.items.first { $0.displayName == "source.txt" }!
+        shelf.setSelection([]) // simulate mid-drag empty/stale selection
+
+        XCTAssertTrue(
+            manager.mergeTextByDrag(
+                shelfId: shelfID,
+                targetID: target.id,
+                sourceIDs: [source.id]
+            )
+        )
+        let after = manager.shelf(id: shelfID)!
+        XCTAssertEqual(after.items.count, 1)
+        XCTAssertEqual(after.items[0].displayName, L10n.mergedTextFileName)
+    }
 }

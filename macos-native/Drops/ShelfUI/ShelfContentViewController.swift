@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import QuickLookUI
 
 /// Empty / collapsed / expanded content with Stage 2 drag + Stage 3 browse/actions.
@@ -16,7 +17,8 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     var onRevealSelection: (() -> Void)?
     var onRemoveSelection: (() -> Void)?
     var onMergeSelection: (() -> Void)?
-    var onMergeDrag: ((ShelfItemID) -> Bool)?
+    /// Drag-merge: target item ID, plus the item IDs actually being dragged.
+    var onMergeDrag: ((ShelfItemID, Set<ShelfItemID>) -> Bool)?
     var onCanMergeSelection: (() -> Bool)?
     var onDisplayModeChange: ((ShelfDisplayMode) -> Void)?
     /// Debug hook retained for Stage 1 demo menu.
@@ -38,6 +40,7 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     private var tableView: NSTableView!
     private var collectionView: NSCollectionView!
     private let collapsedStackView = CollapsedStackView()
+    private let mergeHintBanner = MergeHintBannerView()
     private var languageObserver: NSObjectProtocol?
 
     private var shelfID: ShelfID?
@@ -55,6 +58,7 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     private var mergeArmed = false
     private var mergeHoverTimer: Timer?
     private var dragMonitorTimer: Timer?
+    private weak var activeDragSession: NSDraggingSession?
     private static let mergeHoverDelay: TimeInterval = 0.45
 
     override func loadView() {
@@ -123,6 +127,12 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         root.addSubview(scrollView)
         root.addSubview(collapsedStackView)
         root.addSubview(enterDetailsButton)
+        root.addSubview(mergeHintBanner)
+
+        mergeHintBanner.translatesAutoresizingMaskIntoConstraints = false
+        mergeHintBanner.isHidden = true
+        mergeHintBanner.setAccessibilityElement(true)
+        mergeHintBanner.setAccessibilityRole(.staticText)
 
         NSLayoutConstraint.activate([
             overlayGrabber.topAnchor.constraint(equalTo: root.topAnchor, constant: 5),
@@ -169,6 +179,11 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
             enterDetailsButton.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -11),
             enterDetailsButton.heightAnchor.constraint(equalToConstant: 28),
             enterDetailsButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 58),
+
+            mergeHintBanner.centerXAnchor.constraint(equalTo: root.centerXAnchor),
+            mergeHintBanner.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -14),
+            mergeHintBanner.leadingAnchor.constraint(greaterThanOrEqualTo: root.leadingAnchor, constant: 16),
+            mergeHintBanner.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -16),
         ])
 
         languageObserver = NotificationCenter.default.addObserver(
@@ -249,14 +264,14 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     // MARK: - Drag destination
 
     func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard canAccept(sender) else { return [] }
+        guard canAcceptExternalDrop(sender) else { return [] }
         isReceivingDrag = true
         view.needsDisplay = true
         return .copy
     }
 
     func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        canAccept(sender) ? .copy : []
+        canAcceptExternalDrop(sender) ? .copy : []
     }
 
     func draggingExited(_ sender: NSDraggingInfo?) {
@@ -265,12 +280,14 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     }
 
     func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        canAccept(sender)
+        canAcceptExternalDrop(sender)
     }
 
     func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         isReceivingDrag = false
         view.needsDisplay = true
+        // Reject same-shelf drops so in-window drags cannot re-insert / "reorder" items.
+        guard canAcceptExternalDrop(sender) else { return false }
         return onPasteboardDrop?(sender.draggingPasteboard) ?? false
     }
 
@@ -314,12 +331,27 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         stopDragMonitor()
         let insideWindow = view.window?.frame.contains(screenPoint) == true
         if mergeArmed, let target = mergeHoverTargetID, insideWindow {
-            let merged = onMergeDrag?(target) ?? false
-            clearMergeHover()
+            let sourceIDs = dragOutItemIDs
+            suppressDragImageReturn(session)
+            clearMergeHover(restoringDragImageReturn: false)
+            activeDragSession = nil
             dragOutItemIDs = []
-            if merged { return }
+            let participants = sourceIDs.union([target])
+            playMergeParticipantPulse(for: participants) { [weak self] in
+                guard let self else { return }
+                // Use dragged item IDs — not selection — local drops no longer
+                // re-insert, so selection may be empty/stale during the drag.
+                let merged = self.onMergeDrag?(target, sourceIDs) ?? false
+                if merged {
+                    self.playMergeResultPulse()
+                } else {
+                    self.onDragOutEnded?(sourceIDs, operation)
+                }
+            }
+            return
         }
         clearMergeHover()
+        activeDragSession = nil
         finishDragOut(operation: operation)
     }
 
@@ -452,6 +484,7 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         tableView.setAccessibilityLabel(L10n.a11yItemList)
         collectionView?.setAccessibilityLabel(L10n.a11yItemGrid)
         view.setAccessibilityLabel(L10n.a11yShelfWindow)
+        refreshMergeFeedback(animated: false)
     }
 
     private func refreshLabels() {
@@ -554,6 +587,22 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         for type in PasteboardMaterializer.registeredDragTypes {
             if pb.availableType(from: [type]) != nil { return true }
         }
+        return false
+    }
+
+    /// External Finder/app drops only — ignore drags that started inside this shelf.
+    private func canAcceptExternalDrop(_ sender: NSDraggingInfo) -> Bool {
+        if isLocalShelfDraggingSource(sender) { return false }
+        return canAccept(sender)
+    }
+
+    private func isLocalShelfDraggingSource(_ sender: NSDraggingInfo) -> Bool {
+        if !dragOutItemIDs.isEmpty { return true }
+        guard let source = sender.draggingSource else { return false }
+        if source as AnyObject === self { return true }
+        if source as AnyObject === view { return true }
+        if let collectionView, source as AnyObject === collectionView { return true }
+        if let tableView, source as AnyObject === tableView { return true }
         return false
     }
 
@@ -673,23 +722,93 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         mergeHoverTimer?.invalidate()
         mergeHoverTargetID = targetID
         mergeArmed = false
+        refreshMergeFeedback(animated: true)
         mergeHoverTimer = Timer.scheduledTimer(withTimeInterval: Self.mergeHoverDelay, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 guard let self, self.mergeHoverTargetID == targetID else { return }
                 self.mergeArmed = true
+                // This must happen before the mouse is released. Setting it in
+                // the drag-end callback is too late to prevent AppKit's return
+                // animation for the source drag image.
+                self.activeDragSession?.animatesToStartingPositionsOnCancelOrFail = false
+                self.refreshMergeFeedback(animated: true)
+                NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .default)
             }
         }
     }
 
-    private func clearMergeHover() {
+    private func clearMergeHover(restoringDragImageReturn: Bool = true) {
+        let hadFeedback = mergeHoverTargetID != nil || mergeArmed || !mergeHintBanner.isHidden
         mergeHoverTimer?.invalidate()
         mergeHoverTimer = nil
+        if restoringDragImageReturn {
+            activeDragSession?.animatesToStartingPositionsOnCancelOrFail = true
+        }
         mergeHoverTargetID = nil
         mergeArmed = false
+        if hadFeedback {
+            refreshMergeFeedback(animated: true)
+        }
     }
 
-    private func startDragMonitor() {
+    /// Banner + target highlight for drag-merge arming (PRD 5.5.2).
+    private func refreshMergeFeedback(animated: Bool) {
+        let state: MergeHintBannerView.State
+        if mergeHoverTargetID != nil, mergeArmed {
+            state = .armed
+        } else if mergeHoverTargetID != nil {
+            state = .pending
+        } else {
+            state = .hidden
+        }
+
+        let apply = { [weak self] in
+            guard let self else { return }
+            self.mergeHintBanner.apply(state: state)
+            self.mergeHintBanner.setAccessibilityLabel(self.mergeHintBanner.accessibilityLabelText)
+            self.applyMergeTargetHighlights()
+        }
+
+        if animated {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.18
+                context.allowsImplicitAnimation = true
+                apply()
+            }
+        } else {
+            apply()
+        }
+    }
+
+    private func applyMergeTargetHighlights() {
+        let targetID = mergeHoverTargetID
+        let armed = mergeArmed
+        if scrollView.documentView === tableView {
+            for row in 0..<items.count {
+                guard let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: false) as? ShelfListCellView
+                else { continue }
+                let highlight: MergeTargetHighlight = {
+                    guard items[row].id == targetID else { return .none }
+                    return armed ? .armed : .pending
+                }()
+                cell.setMergeHighlight(highlight)
+            }
+        } else if let collectionView {
+            for index in 0..<items.count {
+                let path = IndexPath(item: index, section: 0)
+                guard let item = collectionView.item(at: path) as? ShelfGridItemView else { continue }
+                let highlight: MergeTargetHighlight = {
+                    guard items[index].id == targetID else { return .none }
+                    return armed ? .armed : .pending
+                }()
+                item.setMergeHighlight(highlight)
+            }
+        }
+    }
+
+    private func startDragMonitor(for session: NSDraggingSession) {
         stopDragMonitor()
+        activeDragSession = session
         dragMonitorTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateMergeHover(at: NSEvent.mouseLocation)
@@ -700,6 +819,72 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     private func stopDragMonitor() {
         dragMonitorTimer?.invalidate()
         dragMonitorTimer = nil
+    }
+
+    /// Keep AppKit from returning the source drag image once a merge is armed.
+    private func suppressDragImageReturn(_ session: NSDraggingSession) {
+        session.animatesToStartingPositionsOnCancelOrFail = false
+    }
+
+    private func itemViews(for ids: Set<ShelfItemID>, makeIfNecessary: Bool = false) -> [NSView] {
+        guard !ids.isEmpty else { return [] }
+        var views: [NSView] = []
+        if scrollView.documentView === tableView {
+            for row in 0..<items.count where ids.contains(items[row].id) {
+                if let cell = tableView.view(atColumn: 0, row: row, makeIfNecessary: makeIfNecessary) {
+                    views.append(cell)
+                }
+            }
+        } else if let collectionView {
+            for index in 0..<items.count where ids.contains(items[index].id) {
+                let path = IndexPath(item: index, section: 0)
+                if let item = collectionView.item(at: path) {
+                    views.append(item.view)
+                }
+            }
+        }
+        return views
+    }
+
+    /// Subtle scale pulse on items about to be consumed by a drag-merge.
+    private func playMergeParticipantPulse(for ids: Set<ShelfItemID>, completion: @escaping () -> Void) {
+        let views = itemViews(for: ids)
+        guard !views.isEmpty else {
+            completion()
+            return
+        }
+        for view in views {
+            view.wantsLayer = true
+            view.layer?.removeAnimation(forKey: "mergeSuccessScale")
+            let animation = CAKeyframeAnimation(keyPath: "transform.scale")
+        animation.values = [1.0, 1.10, 0.96, 1.0]
+        animation.keyTimes = [0, 0.32, 0.72, 1.0]
+        animation.duration = 0.28
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            view.layer?.add(animation, forKey: "mergeSuccessScale")
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            completion()
+        }
+    }
+
+    /// Light in-place scale pulse on the merge result (selected after replaceItems).
+    private func playMergeResultPulse() {
+        // Defer one turn so reloadData has materialised the result cell.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let views = self.itemViews(for: self.selection, makeIfNecessary: true)
+            for view in views {
+                view.wantsLayer = true
+                view.layer?.removeAnimation(forKey: "mergeResultPulse")
+                let animation = CAKeyframeAnimation(keyPath: "transform.scale")
+                animation.values = [1.0, 1.06, 1.0]
+                animation.keyTimes = [0, 0.45, 1.0]
+                animation.duration = 0.28
+                animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                view.layer?.add(animation, forKey: "mergeResultPulse")
+            }
+        }
     }
 
     private func itemID(at localPoint: NSPoint) -> ShelfItemID? {
@@ -831,7 +1016,11 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     }
 
     @objc private func contextReveal() { onRevealSelection?() }
-    @objc private func contextMerge() { onMergeSelection?() }
+    @objc private func contextMerge() {
+        onMergeSelection?()
+        playMergeResultPulse()
+    }
+
     @objc private func contextRemove() { onRemoveSelection?() }
 }
 
@@ -881,7 +1070,7 @@ extension ShelfContentViewController: NSTableViewDataSource, NSTableViewDelegate
             pb.clearContents()
             pb.writeObjects(writers(for: payload))
         }
-        startDragMonitor()
+        startDragMonitor(for: session)
     }
 
     func tableView(
@@ -965,7 +1154,7 @@ extension ShelfContentViewController: NSCollectionViewDataSource, NSCollectionVi
             session.draggingPasteboard.clearContents()
             session.draggingPasteboard.writeObjects(writers(for: payload))
         }
-        startDragMonitor()
+        startDragMonitor(for: session)
     }
 
     func collectionView(
@@ -1114,6 +1303,105 @@ private final class KeyHandlingTableView: NSTableView {
     }
 }
 
+private enum MergeTargetHighlight {
+    case none
+    case pending
+    case armed
+}
+
+/// Floating cue shown while dragging text onto another text item for merge.
+private final class MergeHintBannerView: NSView {
+    enum State {
+        case hidden
+        case pending
+        case armed
+    }
+
+    private let iconView = NSImageView()
+    private let titleLabel = NSTextField(labelWithString: "")
+    private(set) var accessibilityLabelText = ""
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 12
+        layer?.cornerCurve = .continuous
+        layer?.masksToBounds = true
+
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.contentTintColor = .white
+
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        titleLabel.textColor = .white
+        titleLabel.alignment = .center
+        titleLabel.lineBreakMode = .byTruncatingTail
+
+        addSubview(iconView)
+        addSubview(titleLabel)
+        NSLayoutConstraint.activate([
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 14),
+            iconView.heightAnchor.constraint(equalToConstant: 14),
+
+            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 6),
+            titleLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 7),
+            titleLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -7),
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func apply(state: State) {
+        // The merge status should be informative but visually still. In
+        // particular, it must not compete with the merge-success animation.
+        layer?.removeAnimation(forKey: "mergePulse")
+        layer?.transform = CATransform3DIdentity
+        switch state {
+        case .hidden:
+            isHidden = true
+            alphaValue = 0
+            accessibilityLabelText = ""
+        case .pending:
+            isHidden = false
+            alphaValue = 1
+            // Soft gray chrome — matches empty/collapsed HUD, no new accent hue.
+            layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.96).cgColor
+            layer?.borderWidth = 1
+            layer?.borderColor = NSColor.separatorColor.cgColor
+            iconView.contentTintColor = .secondaryLabelColor
+            titleLabel.textColor = .secondaryLabelColor
+            iconView.image = NSImage(
+                systemSymbolName: "clock.arrow.circlepath",
+                accessibilityDescription: nil
+            )
+            titleLabel.stringValue = L10n.mergeHoverPending
+            accessibilityLabelText = L10n.mergeHoverPending
+        case .armed:
+            isHidden = false
+            alphaValue = 1
+            // Same blue family as selection / drag highlight.
+            layer?.backgroundColor = NSColor.selectedContentBackgroundColor.cgColor
+            layer?.borderWidth = 0
+            layer?.borderColor = nil
+            iconView.contentTintColor = .white
+            titleLabel.textColor = .white
+            iconView.image = NSImage(
+                systemSymbolName: "arrow.triangle.merge",
+                accessibilityDescription: nil
+            )
+            titleLabel.stringValue = L10n.mergeHoverArmed
+            accessibilityLabelText = L10n.mergeHoverArmed
+        }
+    }
+}
+
 /// Button that starts a dragging session on mouse-drag (collapsed stack affordance).
 private final class CollapsedStackDragButton: NSButton {
     var onBeginDrag: ((NSEvent) -> Void)?
@@ -1143,9 +1431,11 @@ private final class ShelfListCellView: NSTableCellView {
     private let iconView = NSImageView()
     private let nameLabel = NSTextField(labelWithString: "")
     private var representedItemID: ShelfItemID?
+    private var mergeHighlight: MergeTargetHighlight = .none
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
+        wantsLayer = true
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyUpOrDown
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -1179,6 +1469,38 @@ private final class ShelfListCellView: NSTableCellView {
             self.iconView.image = image
         }
     }
+
+    func setMergeHighlight(_ highlight: MergeTargetHighlight) {
+        mergeHighlight = highlight
+        wantsLayer = true
+        switch highlight {
+        case .none:
+            layer?.borderWidth = 0
+            layer?.borderColor = nil
+            layer?.backgroundColor = nil
+            layer?.cornerRadius = 0
+            layer?.removeAnimation(forKey: "mergePulse")
+        case .pending:
+            // Align with drag-in blue ring, lighter than selection fill.
+            layer?.cornerRadius = 6
+            layer?.borderWidth = 1.5
+            layer?.borderColor = NSColor.systemBlue.withAlphaComponent(0.55).cgColor
+            layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.10).cgColor
+            layer?.removeAnimation(forKey: "mergePulse")
+        case .armed:
+            layer?.cornerRadius = 6
+            layer?.borderWidth = 2
+            layer?.borderColor = NSColor.systemBlue.cgColor
+            layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.35).cgColor
+            let animation = CABasicAnimation(keyPath: "borderWidth")
+            animation.fromValue = 1.5
+            animation.toValue = 2.5
+            animation.duration = 0.45
+            animation.autoreverses = true
+            animation.repeatCount = .infinity
+            layer?.add(animation, forKey: "mergePulse")
+        }
+    }
 }
 
 private final class ShelfGridItemView: NSCollectionViewItem {
@@ -1187,6 +1509,7 @@ private final class ShelfGridItemView: NSCollectionViewItem {
     private let iconView = NSImageView()
     private let nameLabel = NSTextField(labelWithString: "")
     private var representedItemID: ShelfItemID?
+    private var mergeHighlight: MergeTargetHighlight = .none
 
     override func loadView() {
         view = NSView()
@@ -1221,14 +1544,49 @@ private final class ShelfGridItemView: NSCollectionViewItem {
             guard let self, self.representedItemID == expectedID, let image else { return }
             self.iconView.image = image
         }
+        setMergeHighlight(.none)
+    }
+
+    func setMergeHighlight(_ highlight: MergeTargetHighlight) {
+        mergeHighlight = highlight
+        view.wantsLayer = true
+        view.layer?.cornerRadius = 8
+        view.layer?.removeAnimation(forKey: "mergePulse")
+        switch highlight {
+        case .none:
+            refreshSelectionBackground()
+            view.layer?.borderWidth = 0
+            view.layer?.borderColor = nil
+        case .pending:
+            view.layer?.borderWidth = 1.5
+            view.layer?.borderColor = NSColor.systemBlue.withAlphaComponent(0.55).cgColor
+            view.layer?.backgroundColor = NSColor.systemBlue.withAlphaComponent(0.10).cgColor
+        case .armed:
+            view.layer?.borderWidth = 2
+            view.layer?.borderColor = NSColor.systemBlue.cgColor
+            view.layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.35).cgColor
+            let animation = CABasicAnimation(keyPath: "transform.scale")
+            animation.fromValue = 1.0
+            animation.toValue = 1.05
+            animation.duration = 0.5
+            animation.autoreverses = true
+            animation.repeatCount = .infinity
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            view.layer?.add(animation, forKey: "mergePulse")
+        }
     }
 
     override var isSelected: Bool {
         didSet {
-            view.layer?.backgroundColor = (isSelected
-                ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.35)
-                : NSColor.clear).cgColor
-            view.layer?.cornerRadius = 8
+            guard mergeHighlight == .none else { return }
+            refreshSelectionBackground()
         }
+    }
+
+    private func refreshSelectionBackground() {
+        view.layer?.backgroundColor = (isSelected
+            ? NSColor.selectedContentBackgroundColor.withAlphaComponent(0.35)
+            : NSColor.clear).cgColor
+        view.layer?.cornerRadius = 8
     }
 }

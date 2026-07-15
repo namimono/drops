@@ -20,7 +20,7 @@ final class ShelfItemDomainTests: XCTestCase {
         XCTAssertEqual(shelf.items.count, 3)
     }
 
-    func testInsertedItemsJoinSelection() {
+    func testInsertedItemsBecomeSoleSelection() {
         let shelf = Shelf(source: .menu, lifecycle: .persistent)
         let a = ShelfItemDraft.file(url: URL(fileURLWithPath: "/tmp/a.txt"), isDirectory: false)
         let b = ShelfItemDraft.file(url: URL(fileURLWithPath: "/tmp/b.txt"), isDirectory: false)
@@ -29,8 +29,9 @@ final class ShelfItemDomainTests: XCTestCase {
         shelf.setSelection([firstID])
 
         _ = shelf.insertItems([b])
-        XCTAssertTrue(shelf.selection.contains(shelf.items[0].id))
-        XCTAssertTrue(shelf.selection.contains(firstID))
+        let newID = shelf.items[0].id
+        XCTAssertEqual(shelf.selection, [newID], "Paste/drop should select only the newly inserted items")
+        XCTAssertFalse(shelf.selection.contains(firstID))
     }
 
     func testSelectionClickReplaceToggleAndRange() {

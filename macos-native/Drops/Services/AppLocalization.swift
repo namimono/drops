@@ -121,6 +121,8 @@ enum L10n {
     static var open: String { AppLocalization.string("shelf.open") }
     static var revealInFinder: String { AppLocalization.string("shelf.reveal") }
     static var mergeText: String { AppLocalization.string("shelf.merge_text") }
+    static var mergeHoverPending: String { AppLocalization.string("shelf.merge_hover_pending") }
+    static var mergeHoverArmed: String { AppLocalization.string("shelf.merge_hover_armed") }
     static var remove: String { AppLocalization.string("shelf.remove") }
 
     static func shelfTitle(shortID: String) -> String {

@@ -169,7 +169,7 @@ final class Shelf: @unchecked Sendable {
     }
 
     /// Inserts drafts newest-first with path/URL identity dedup. Existing matches move to front.
-    /// Newly inserted or moved items join the selection set (PRD 5.4.1).
+    /// Newly inserted or moved-to-front items become the sole selection.
     @discardableResult
     func insertItems(_ drafts: [ShelfItemDraft]) -> [ShelfItem] {
         guard !drafts.isEmpty else { return [] }
@@ -195,7 +195,7 @@ final class Shelf: @unchecked Sendable {
         let frontKeys = Set(front.map(\.identityKey))
         let rest = items.filter { !frontKeys.contains($0.identityKey) }
         items = front + rest
-        selection.formUnion(Set(front.map(\.id)))
+        selection = Set(front.map(\.id))
         if presentation == .empty {
             presentation = .collapsed
         }

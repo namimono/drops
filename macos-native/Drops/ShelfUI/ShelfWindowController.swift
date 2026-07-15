@@ -43,7 +43,7 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     var onRevealSelection: (() -> Void)?
     var onRemoveSelection: (() -> Void)?
     var onMergeSelection: (() -> Void)?
-    var onMergeDrag: ((ShelfItemID) -> Bool)?
+    var onMergeDrag: ((ShelfItemID, Set<ShelfItemID>) -> Bool)?
     var onCanMergeSelection: (() -> Bool)?
     var onDisplayModeChange: ((ShelfDisplayMode) -> Void)?
     var onSimulateReceive: (() -> Void)?
@@ -150,7 +150,9 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         contentController.onRevealSelection = { [weak self] in self?.onRevealSelection?() }
         contentController.onRemoveSelection = { [weak self] in self?.onRemoveSelection?() }
         contentController.onMergeSelection = { [weak self] in self?.onMergeSelection?() }
-        contentController.onMergeDrag = { [weak self] id in self?.onMergeDrag?(id) ?? false }
+        contentController.onMergeDrag = { [weak self] target, sources in
+            self?.onMergeDrag?(target, sources) ?? false
+        }
         contentController.onCanMergeSelection = { [weak self] in self?.onCanMergeSelection?() ?? false }
         contentController.onDisplayModeChange = { [weak self] mode in self?.onDisplayModeChange?(mode) }
         contentController.onSimulateReceive = { [weak self] in self?.onSimulateReceive?() }

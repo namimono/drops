@@ -1214,6 +1214,40 @@
         }
       }
     },
+    "shelf.merge_hover_pending" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold to merge text"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停留以合并文本"
+          }
+        }
+      }
+    },
+    "shelf.merge_hover_armed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Merging text — release to finish"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在合并文本，松手完成"
+          }
+        }
+      }
+    },
     "shelf.open" : {
       "extractionState" : "manual",
       "localizations" : {

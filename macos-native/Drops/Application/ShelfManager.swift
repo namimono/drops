@@ -373,12 +373,19 @@ final class ShelfManager {
     }
 
     /// Drag-append merge onto `targetID` (PRD 5.5.2).
+    /// `sourceIDs` are the items actually being dragged (not the current selection).
     @discardableResult
-    func mergeTextByDrag(shelfId: ShelfID, targetID: ShelfItemID) -> Bool {
+    func mergeTextByDrag(
+        shelfId: ShelfID,
+        targetID: ShelfItemID,
+        sourceIDs: Set<ShelfItemID>
+    ) -> Bool {
         guard let shelf = activeShelf(id: shelfId), let textMerge else { return false }
         guard let target = shelf.items.first(where: { $0.id == targetID }),
               target.isPlainTextForMerge else { return false }
-        let sources = shelf.orderedSelection().filter { $0.id != targetID && $0.isPlainTextForMerge }
+        let sources = shelf.items.filter {
+            sourceIDs.contains($0.id) && $0.id != targetID && $0.isPlainTextForMerge
+        }
         guard !sources.isEmpty else { return false }
         do {
             let draft = try textMerge.mergeDragAppend(
@@ -587,11 +594,15 @@ final class ShelfManager {
                 _ = self?.mergeSelectedText(shelfId: id)
             }
         }
-        controller.onMergeDrag = { [weak self] targetID in
+        controller.onMergeDrag = { [weak self] targetID, sourceIDs in
             guard let self else { return false }
             var merged = false
             self.handleLateEvent(shelfId: id) {
-                merged = self.mergeTextByDrag(shelfId: id, targetID: targetID)
+                merged = self.mergeTextByDrag(
+                    shelfId: id,
+                    targetID: targetID,
+                    sourceIDs: sourceIDs
+                )
             }
             return merged
         }

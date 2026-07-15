@@ -1,6 +1,6 @@
 # Drops macOS 原生化 · 开发进度
 
-> 更新日期：2026-07-14  
+> 更新日期：2026-07-15
 > 对应方案：[README.md](./README.md)  
 > 产品依据：[Drops-PRD.md](../Drops-PRD.md)  
 > 阶段 0 实施：[stage-0-requirements-and-validation.md](./stage-0-requirements-and-validation.md)  
@@ -24,10 +24,10 @@
 | 阶段 0 | 需求冻结与技术验证 | **已完成** | S0-01～S0-10 通过 |
 | 阶段 1 | 内容架领域与窗口骨架 | **已完成** | REV-S1 已关闭 |
 | 阶段 2 | 拖放与剪贴板主链路 | **已完成** | REV-S2 已关闭 |
-| 阶段 3 | 原生交互完善 | **代码已实现，待手工验收** | REV-S3 已关闭；本地化/收起堆/无障碍标签/阶段 4 接入点规划已落地；详情尺寸与 Space Quick Look 交互已修；自动化 89/89 |
+| 阶段 3 | 原生交互完善 | **代码已实现，待手工验收** | REV-S3 已关闭；本地化/收起堆/无障碍标签/阶段 4 接入点规划已落地；详情尺寸与 Space Quick Look 交互已修；自动化 90/90 |
 | 阶段 4 | 发布准备 | **未开始** | 接入点规划见 [stage-4 §9](./stage-4-release-readiness.md#9-发布接入点规划阶段-3-预埋) |
 
-**综合判断：阶段 3 产品代码与自动化回归已就绪（89/89）。手工反馈的详情尺寸 / 选中跳变 / Space Quick Look 已在代码侧修复，待按 [手工验收清单](./stage-3-manual-acceptance.md) 复验后再申请退出阶段 3。**
+**综合判断：阶段 3 产品代码与自动化回归已就绪（90/90）。手工反馈的详情尺寸 / 选中跳变 / Space Quick Look 已在代码侧修复，待按 [手工验收清单](./stage-3-manual-acceptance.md) 复验后再申请退出阶段 3。**
 
 ## 2. 已实现能力
 
@@ -70,7 +70,13 @@
 | 自动化 | en / zh-Hans 覆盖与手动切换 | **通过** | `AppLocalizationTests` |
 | 自动化 | 收起堆显示 / 展开隐藏 | **通过** | `CollapsedStackViewTests` |
 | 手工反馈修复 | 详情框过大；单击选中框突然变大；Space 无法 Quick Look / 误触 Finder 预览 | **代码已实现，待手工复验** | 展开尺寸随数量增长；选区轻量同步；Space 转发 + `acceptsPreviewPanelControl` + 点击时激活 Drops，避免 Finder 抢走预览 |
+| 手工反馈修复 | 拖放文本合并无感知 | **代码已实现，待手工复验** | 停留/就绪用灰白与选中蓝提示 + 底部文案「正在合并文本，松手完成」+ 触感；本地化抽查通过 |
+| 手工反馈修复 | 合并成功后拖影先回弹再消失；零尺寸拖影导致崩溃；就绪提示呼吸缩放 | **代码已实现，待手工复验** | 达到悬停就绪时即关闭 drag-image 回位，不再给 `NSDraggingItem` 设置非法零尺寸 frame；参与项以 0.28 秒放大—回缩后再 `replaceItems`；底部提示保持静态，结果项仍轻脉冲。`xcodebuild test -scheme Drops -destination 'platform=macOS'` 通过（90/90，2026-07-15）。 |
+| 手工反馈修复 | 禁用架内重排后拖放合并失效 | **已修复，待手工复验** | 合并源改为拖出的 `dragOutItemIDs`，不依赖可能为空的选区；`testDragMergeUsesSourceIDsEvenWhenSelectionEmpty` 通过 |
+| 手工反馈修复 | 粘贴后旧首项仍被选中；框内拖放误触发“排序” | **代码已实现，待手工复验** | `insertItems` 仅选中新插入项；拒绝同源架内 drop 避免重插入前移；领域单测通过；PRD 5.4.1 已同步 |
+| 自动化 | 合并相关聚焦单测 | **通过** | `TextMergeServiceTests` + `ShelfItemDomainTests` + `ShelfStage3InteractionTests`（15/15，2026-07-14） |
 | 自动化 | 展开尺寸随数量增长并封顶 | **通过** | `testExpandedSizeGrowsWithItemCountAndCapsAtMax` |
+| 自动化 | 插入后选区仅为新项 | **通过** | `testInsertedItemsBecomeSoleSelection` |
 | 审查 | REV-S3-001～005 | **已关闭** | 见 stage-3-review-issues.md |
 | 手工 | S3-01/03/05/07～14 | **待验证** | [stage-3-manual-acceptance.md](./stage-3-manual-acceptance.md) |
 
@@ -81,6 +87,9 @@
 - [x] REV-S3-001～005。
 - [x] String Catalog（en + zh-Hans）+ 运行时语言覆盖。
 - [x] 手工反馈：详情尺寸 / 选中框跳变 / Space Quick Look（代码已修，待手工复验）。
+- [x] 手工反馈：拖放文本合并增加高亮与「正在合并文本」提示（待手工复验）。
+- [x] 手工反馈：粘贴仅选中新项；禁用架内拖放重排（待手工复验）。
+- [x] 手工反馈：合并成功取消拖影回弹 + 参与项/结果项缩放脉冲（待手工复验）。
 - [ ] 按 [手工验收清单](./stage-3-manual-acceptance.md) 完成勾选并记录问题。
 
 ### P1 · 治理、性能或维护性
@@ -95,13 +104,13 @@
 | 验收项 | 状态 |
 |---|---|
 | S3-01 网格/列表与图标缩略图 | **代码已实现，待手工验证** |
-| S3-02 选择一致性 | **代码已实现，待手工验证**（选区同步不再整窗 reload） |
+| S3-02 选择一致性 | **代码已实现，待手工验证**（选区同步不再整窗 reload；粘贴/拖入仅选中新项） |
 | S3-03 打开 / 定位 / 失败反馈 | **代码已实现，待手工验证** |
 | S3-04 混选预览 | **已验证（自动化决策）**；Space→QL 已修（焦点转发 + 防 Finder 抢预览），**待手工** |
 | S3-05 右键 / 移除安全 | **代码已实现，待手工验证** |
 | S3-06 菜单文本合并 | **已验证（自动化）** |
-| S3-07 拖放文本合并 | **代码已实现，待手工验证** |
-| S3-08 动画与高频 | **待手工验证**（含展开尺寸随数量变化） |
+| S3-07 拖放文本合并 | **代码已实现，待手工验证**（高亮/文案提示 + 成功无拖影回弹 + 缩放脉冲） |
+| S3-08 动画与高频 | **待手工验证**（含展开尺寸随数量变化；合并成功缩放） |
 | S3-09 多屏 / 缩放 / 深浅色 | **代码已实现，待手工验证**（清单已备） |
 | S3-10 菜单栏入口 | **代码已实现，待手工验证** |
 | S3-11 英/简中与回退 | **代码已实现，待手工验证**（有自动化抽查） |
@@ -111,27 +120,27 @@
 
 ## 8. 建议下一迭代顺序
 
-1. 手工复验：少文件详情框高度、单击选中不跳变、Space Quick Look（含先切到 Finder 再点回内容架）。
+1. 手工复验：合并成功无拖影回弹与缩放脉冲、粘贴仅选中新项、架内拖放不再重排、合并反馈色（灰/蓝）、详情尺寸 / Space Quick Look。
 2. 按 [stage-3-manual-acceptance.md](./stage-3-manual-acceptance.md) 完成其余勾选并回填。
 3. 进入 [stage-4-release-readiness.md](./stage-4-release-readiness.md)，按 §9 启用 Sandbox → Developer ID → 公证。
 
 ## 9. 变更文件速查
 
-**本轮（详情尺寸 / 选中跳变 / Space Quick Look）**
+**本轮（合并成功动画 / 取消拖影回弹）**
 
-- `macos-native/Drops/Services/QuickLookPreviewController.swift`（仅在 `beginPreviewPanelControl` 挂 dataSource；打开前激活 App）
-- `macos-native/Drops/ShelfUI/ShelfWindowController.swift`（展开尺寸随 itemCount 增长；`claimKeyFocus`）
-- `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`（网格行高；选区轻量同步；Space 转发；QL responder 链；点击激活）
-- `macos-native/Drops/Application/ShelfManager.swift`（选区不整窗 refresh；预览前 `claimKeyFocus`）
-- `macos-native/DropsTests/ShelfManagerWindowTests.swift`（尺寸增长单测 + 断言适配）
+- `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`（抑制拖影回弹且不再设置非法零尺寸 frame；参与项/结果缩放脉冲；菜单合并结果脉冲）
 - `docs/macos-native/development-progress.md`
 
-**上轮（本地化 / 收起堆 / a11y / 阶段 4 规划）**
+**上轮（粘贴选区 / 禁用架内重排）**
 
-- `macos-native/Drops/Resources/Localizable.xcstrings`
-- `macos-native/Drops/Services/AppLocalization.swift`
-- `macos-native/Drops/ShelfUI/CollapsedStackView.swift`
-- `macos-native/Drops/Application/{MenuBar,Settings,About,Application}Controller.swift`
-- `macos-native/DropsTests/AppLocalizationTests.swift` / `CollapsedStackViewTests.swift`
-- `docs/macos-native/stage-3-manual-acceptance.md`
-- `docs/macos-native/stage-4-release-readiness.md`（§9）
+- `macos-native/Drops/Domain/ShelfModels.swift`（`insertItems` 仅选中新项）
+- `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`（拒绝同源架内 drop）
+- `macos-native/DropsTests/ShelfItemDomainTests.swift`
+- `docs/Drops-PRD.md`（5.4.1 选区规则）
+- `docs/macos-native/development-progress.md`
+
+**更早（拖放合并反馈 / 灰蓝配色）**
+
+- `macos-native/Drops/ShelfUI/ShelfContentViewController.swift`
+- `macos-native/Drops/Services/AppLocalization.swift` / `Resources/Localizable.xcstrings`
+- `macos-native/DropsTests/AppLocalizationTests.swift`

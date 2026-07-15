@@ -17,7 +17,6 @@ final class CollapsedStackView: NSView {
         return view
     }
 
-    private let countBadge = NSTextField(labelWithString: "")
     private var mouseDownEvent: NSEvent?
     private var itemCount = 0
 
@@ -29,32 +28,22 @@ final class CollapsedStackView: NSView {
             addSubview(icon)
             icon.isHidden = true
         }
-        countBadge.translatesAutoresizingMaskIntoConstraints = false
-        countBadge.font = .systemFont(ofSize: 11, weight: .semibold)
-        countBadge.textColor = .secondaryLabelColor
-        countBadge.alignment = .center
-        addSubview(countBadge)
-
-        // Back-to-front stacking with slight offsets.
+        // Back-to-front stacking around the center of the compact overlay.
         NSLayoutConstraint.activate([
-            iconViews[2].leadingAnchor.constraint(equalTo: leadingAnchor, constant: 28),
-            iconViews[2].centerYAnchor.constraint(equalTo: centerYAnchor, constant: -6),
-            iconViews[2].widthAnchor.constraint(equalToConstant: 44),
-            iconViews[2].heightAnchor.constraint(equalToConstant: 44),
+            iconViews[2].centerXAnchor.constraint(equalTo: centerXAnchor, constant: 11),
+            iconViews[2].centerYAnchor.constraint(equalTo: centerYAnchor, constant: 1),
+            iconViews[2].widthAnchor.constraint(equalToConstant: 52),
+            iconViews[2].heightAnchor.constraint(equalToConstant: 52),
 
-            iconViews[1].leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
-            iconViews[1].centerYAnchor.constraint(equalTo: centerYAnchor, constant: -2),
-            iconViews[1].widthAnchor.constraint(equalToConstant: 48),
-            iconViews[1].heightAnchor.constraint(equalToConstant: 48),
+            iconViews[1].centerXAnchor.constraint(equalTo: centerXAnchor, constant: 4),
+            iconViews[1].centerYAnchor.constraint(equalTo: centerYAnchor, constant: 5),
+            iconViews[1].widthAnchor.constraint(equalToConstant: 56),
+            iconViews[1].heightAnchor.constraint(equalToConstant: 56),
 
-            iconViews[0].leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
-            iconViews[0].centerYAnchor.constraint(equalTo: centerYAnchor, constant: 2),
-            iconViews[0].widthAnchor.constraint(equalToConstant: 52),
-            iconViews[0].heightAnchor.constraint(equalToConstant: 52),
-
-            countBadge.leadingAnchor.constraint(equalTo: iconViews[0].trailingAnchor, constant: 12),
-            countBadge.centerYAnchor.constraint(equalTo: centerYAnchor),
-            countBadge.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -4),
+            iconViews[0].centerXAnchor.constraint(equalTo: centerXAnchor, constant: -4),
+            iconViews[0].centerYAnchor.constraint(equalTo: centerYAnchor, constant: 9),
+            iconViews[0].widthAnchor.constraint(equalToConstant: 60),
+            iconViews[0].heightAnchor.constraint(equalToConstant: 60),
         ])
 
         setAccessibilityElement(true)
@@ -92,7 +81,6 @@ final class CollapsedStackView: NSView {
         iconViews[1].layer?.zPosition = 1
         iconViews[0].layer?.zPosition = 2
 
-        countBadge.stringValue = L10n.collapsedStackSummary(count: itemCount)
         setAccessibilityLabel(L10n.a11yCollapsedCount(itemCount))
         setAccessibilityHelp(L10n.a11yCollapsedStack)
     }
