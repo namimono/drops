@@ -84,8 +84,8 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
 
         configureRoundIcon(button: overlayCloseButton, symbolName: "xmark", action: #selector(closeTapped))
         configureRoundIcon(button: detailBackButton, symbolName: "chevron.left", action: #selector(collapseTapped))
-        configureRoundIcon(button: gridModeButton, symbolName: "square.grid.2x2", action: #selector(gridModeTapped))
-        configureRoundIcon(button: listModeButton, symbolName: "list.bullet", action: #selector(listModeTapped))
+        configureModeIcon(button: gridModeButton, symbolName: "square.grid.2x2", action: #selector(gridModeTapped))
+        configureModeIcon(button: listModeButton, symbolName: "list.bullet", action: #selector(listModeTapped))
         configureEnterDetailsButton()
 
         overlayGrabber.wantsLayer = true
@@ -114,7 +114,7 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
 
         let modeRow = NSStackView(views: [gridModeButton, listModeButton])
         modeRow.orientation = .horizontal
-        modeRow.spacing = 6
+        modeRow.spacing = 4
         modeRow.translatesAutoresizingMaskIntoConstraints = false
 
         root.addSubview(overlayGrabber)
@@ -336,17 +336,18 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
             clearMergeHover(restoringDragImageReturn: false)
             activeDragSession = nil
             dragOutItemIDs = []
-            let participants = sourceIDs.union([target])
-            playMergeParticipantPulse(for: participants) { [weak self] in
-                guard let self else { return }
-                // Use dragged item IDs — not selection — local drops no longer
-                // re-insert, so selection may be empty/stale during the drag.
-                let merged = self.onMergeDrag?(target, sourceIDs) ?? false
-                if merged {
-                    self.playMergeResultPulse()
-                } else {
-                    self.onDragOutEnded?(sourceIDs, operation)
-                }
+            // Hide dragged sources immediately so AppKit's drag-end cleanup cannot
+            // flash them back into their shelf slots before replaceItems runs.
+            // Do not pulse-then-remove: that is what looked like "snap back, shake, vanish".
+            setItemViewsHidden(sourceIDs, hidden: true)
+            // Use dragged item IDs — not selection — local drops no longer
+            // re-insert, so selection may be empty/stale during the drag.
+            let merged = onMergeDrag?(target, sourceIDs) ?? false
+            if merged {
+                playMergeResultPulse()
+            } else {
+                setItemViewsHidden(sourceIDs, hidden: false)
+                onDragOutEnded?(sourceIDs, operation)
             }
             return
         }
@@ -623,6 +624,30 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         button.layer?.backgroundColor = NSColor.quaternaryLabelColor.withAlphaComponent(0.6).cgColor
     }
 
+    /// Grid / list toggle: clearer SF Symbols, larger hit target; active gets light rounded rect only.
+    private func configureModeIcon(button: NSButton, symbolName: String, action: Selector?) {
+        button.bezelStyle = .inline
+        button.isBordered = false
+        button.imagePosition = .imageOnly
+        button.image = NSImage(
+            systemSymbolName: symbolName,
+            accessibilityDescription: nil
+        )
+        button.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
+        button.contentTintColor = .labelColor
+        button.target = self
+        button.action = action
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 8
+        button.layer?.cornerCurve = .continuous
+        button.layer?.backgroundColor = NSColor.clear.cgColor
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 34),
+            button.heightAnchor.constraint(equalToConstant: 28),
+        ])
+    }
+
     private func configureEnterDetailsButton() {
         enterDetailsButton.bezelStyle = .inline
         enterDetailsButton.font = .systemFont(ofSize: 11, weight: .medium)
@@ -637,11 +662,10 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
     }
 
     private func updateModeButtonAppearance(_ button: NSButton, selected: Bool) {
-        button.contentTintColor = selected ? .labelColor : .secondaryLabelColor
-        button.layer?.backgroundColor = (selected
-            ? NSColor.tertiaryLabelColor.withAlphaComponent(0.7)
-            : NSColor.quaternaryLabelColor.withAlphaComponent(0.6)
-        ).cgColor
+        button.contentTintColor = .labelColor
+        button.layer?.backgroundColor = selected
+            ? NSColor.quaternaryLabelColor.withAlphaComponent(0.85).cgColor
+            : NSColor.clear.cgColor
     }
 
     private func detailTitle(for count: Int) -> String {
@@ -719,6 +743,10 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         }
 
         if mergeHoverTargetID == targetID { return }
+        if mergeArmed {
+            setItemViewsHidden(dragOutItemIDs, hidden: false)
+            activeDragSession?.animatesToStartingPositionsOnCancelOrFail = true
+        }
         mergeHoverTimer?.invalidate()
         mergeHoverTargetID = targetID
         mergeArmed = false
@@ -731,6 +759,9 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
                 // the drag-end callback is too late to prevent AppKit's return
                 // animation for the source drag image.
                 self.activeDragSession?.animatesToStartingPositionsOnCancelOrFail = false
+                // Hide sources while armed so drag-end cannot reveal them at their
+                // shelf slots (that flash-back is what users perceived as snap-back).
+                self.setItemViewsHidden(self.dragOutItemIDs, hidden: true)
                 self.refreshMergeFeedback(animated: true)
                 NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .default)
             }
@@ -739,6 +770,8 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
 
     private func clearMergeHover(restoringDragImageReturn: Bool = true) {
         let hadFeedback = mergeHoverTargetID != nil || mergeArmed || !mergeHintBanner.isHidden
+        let wasArmed = mergeArmed
+        let sourceIDs = dragOutItemIDs
         mergeHoverTimer?.invalidate()
         mergeHoverTimer = nil
         if restoringDragImageReturn {
@@ -746,6 +779,11 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         }
         mergeHoverTargetID = nil
         mergeArmed = false
+        // Only restore sources when cancelling arm (left target / left window).
+        // On successful merge commit we keep them hidden until replaceItems.
+        if wasArmed, restoringDragImageReturn {
+            setItemViewsHidden(sourceIDs, hidden: false)
+        }
         if hadFeedback {
             refreshMergeFeedback(animated: true)
         }
@@ -846,25 +884,10 @@ final class ShelfContentViewController: NSViewController, NSDraggingSource {
         return views
     }
 
-    /// Subtle scale pulse on items about to be consumed by a drag-merge.
-    private func playMergeParticipantPulse(for ids: Set<ShelfItemID>, completion: @escaping () -> Void) {
-        let views = itemViews(for: ids)
-        guard !views.isEmpty else {
-            completion()
-            return
-        }
-        for view in views {
-            view.wantsLayer = true
-            view.layer?.removeAnimation(forKey: "mergeSuccessScale")
-            let animation = CAKeyframeAnimation(keyPath: "transform.scale")
-        animation.values = [1.0, 1.10, 0.96, 1.0]
-        animation.keyTimes = [0, 0.32, 0.72, 1.0]
-        animation.duration = 0.28
-            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            view.layer?.add(animation, forKey: "mergeSuccessScale")
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            completion()
+    /// Hide or restore shelf item views without waiting for reloadData.
+    private func setItemViewsHidden(_ ids: Set<ShelfItemID>, hidden: Bool) {
+        for view in itemViews(for: ids) {
+            view.alphaValue = hidden ? 0 : 1
         }
     }
 
