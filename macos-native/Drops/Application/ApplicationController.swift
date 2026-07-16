@@ -39,7 +39,7 @@ final class ApplicationController {
             self?.presentUserMessage(title, message, .warning)
         }
         configureMenuBar()
-        hotkeyManager.start { [weak self] in
+        hotkeyManager.start(settings: shelfManager.settingsStore) { [weak self] in
             self?.createPersistentShelf(source: .hotkey)
         }
         configureInputCoordinator()
@@ -107,6 +107,18 @@ final class ApplicationController {
                 onLanguageChanged: { [weak self] language in
                     self?.shelfManager.settingsStore.setLanguageOverride(language)
                     AppLocalization.languageOverride = language
+                },
+                onShakeSensitivityChanged: { [weak self] sensitivity in
+                    self?.inputCoordinator?.shakeSensitivity = sensitivity
+                },
+                onHotkeyChanged: { [weak self] in
+                    self?.hotkeyManager.reload()
+                },
+                onMenuShortcutsChanged: { [weak self] in
+                    guard let self else { return }
+                    self.menuBar?.updateShortcutBindings(
+                        self.shelfManager.settingsStore.menuShortcutBindings()
+                    )
                 },
                 onCleanupRequested: { [weak self] in
                     self?.cleanupTemporaryFilesNow()
@@ -195,6 +207,7 @@ final class ApplicationController {
                 self?.shelfManager.endExternalDrag(dragSessionId: id)
             }
         )
+        coordinator.shakeSensitivity = shelfManager.settingsStore.shakeSensitivity
         coordinator.start()
         inputCoordinator = coordinator
     }
@@ -215,6 +228,7 @@ final class ApplicationController {
 
     private func configureMenuBar() {
         let controller = MenuBarController(
+            shortcutBindings: shelfManager.settingsStore.menuShortcutBindings(),
             onNewShelf: { [weak self] in self?.createPersistentShelf(source: .menu) },
             onOpenSettings: { [weak self] in self?.openSettings() },
             onOpenAbout: { [weak self] in self?.openAbout() },

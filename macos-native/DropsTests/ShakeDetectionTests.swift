@@ -42,4 +42,37 @@ final class ShakeDetectionTests: XCTestCase {
             )
         )
     }
+
+    func testHighSensitivityAcceptsFewerDirectionChangesThanMedium() {
+        let now = Date()
+        // 3 horizontal reversals — enough for high (threshold 3), not for medium (4).
+        let positions: [CGPoint] = [
+            CGPoint(x: 0, y: 0),
+            CGPoint(x: 100, y: 0),
+            CGPoint(x: 0, y: 0),
+            CGPoint(x: 100, y: 0),
+            CGPoint(x: 0, y: 0),
+        ]
+        let timestamps = (0..<positions.count).map {
+            now.addingTimeInterval(Double($0) * 0.08)
+        }
+        let high = SettingsStore.ShakeSensitivity.high
+        let medium = SettingsStore.ShakeSensitivity.medium
+        XCTAssertTrue(
+            ShakeDetector.detect(
+                positions: positions,
+                timestamps: timestamps,
+                threshold: high.threshold,
+                minVelocity: high.minVelocity
+            )
+        )
+        XCTAssertFalse(
+            ShakeDetector.detect(
+                positions: positions,
+                timestamps: timestamps,
+                threshold: medium.threshold,
+                minVelocity: medium.minVelocity
+            )
+        )
+    }
 }

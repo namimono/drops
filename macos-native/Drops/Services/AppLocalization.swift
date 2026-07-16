@@ -140,6 +140,8 @@ enum L10n {
 
     static var settingsWindowTitle: String { AppLocalization.string("settings.window_title") }
     static var settingsGeneral: String { AppLocalization.string("settings.general") }
+    static var settingsInteraction: String { AppLocalization.string("settings.interaction") }
+    static var settingsShortcuts: String { AppLocalization.string("settings.shortcuts") }
     static var settingsRetention: String { AppLocalization.string("settings.retention") }
     static var settingsSave: String { AppLocalization.string("settings.save") }
     static var settingsRetentionError: String { AppLocalization.string("settings.retention_error") }
@@ -153,6 +155,19 @@ enum L10n {
     static var settingsSecurity: String { AppLocalization.string("settings.security") }
     static var settingsSecurityBody: String { AppLocalization.string("settings.security_body") }
     static var settingsLanguageRestartHint: String { AppLocalization.string("settings.language_restart_hint") }
+    static var settingsShakeSensitivity: String { AppLocalization.string("settings.shake_sensitivity") }
+    static var settingsShakeLow: String { AppLocalization.string("settings.shake_low") }
+    static var settingsShakeMedium: String { AppLocalization.string("settings.shake_medium") }
+    static var settingsShakeHigh: String { AppLocalization.string("settings.shake_high") }
+    static var settingsShakeHint: String { AppLocalization.string("settings.shake_hint") }
+    static var settingsHotkeyEnabled: String { AppLocalization.string("settings.hotkey_enabled") }
+    static var settingsHotkeySummon: String { AppLocalization.string("settings.hotkey_summon") }
+    static var settingsHotkeyGlobalCaption: String { AppLocalization.string("settings.hotkey_global_caption") }
+    static var settingsHotkeyHint: String { AppLocalization.string("settings.hotkey_hint") }
+    static var settingsHotkeyRecording: String { AppLocalization.string("settings.hotkey_recording") }
+    static var settingsHotkeyConflict: String { AppLocalization.string("settings.hotkey_conflict") }
+    static var settingsResetShortcut: String { AppLocalization.string("settings.reset_shortcut") }
+    static var settingsResetAllShortcuts: String { AppLocalization.string("settings.reset_all_shortcuts") }
 
     static var aboutWindowTitle: String { AppLocalization.string("about.window_title") }
     static var aboutBlurb: String { AppLocalization.string("about.blurb") }

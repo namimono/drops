@@ -17,9 +17,8 @@ final class GlobalInputCoordinator {
     private var timestamps: [Date] = []
     private var currentDragSessionId: DragSessionID?
 
-    private let shakeThreshold = 4
-    private let timeWindow: TimeInterval = 1
-    private let minVelocity: CGFloat = 200
+    /// Updated from Settings; defaults match historical medium sensitivity.
+    var shakeSensitivity: SettingsStore.ShakeSensitivity = .medium
 
     private let onBeginExternalDrag: (DragSessionID) -> Void
     private let onShake: (NSPoint, DragSessionID) -> Void
@@ -102,8 +101,9 @@ final class GlobalInputCoordinator {
         positions.append(currentPos)
         timestamps.append(currentTime)
 
+        let sensitivity = shakeSensitivity
         while timestamps.count > 1,
-              currentTime.timeIntervalSince(timestamps[0]) > timeWindow {
+              currentTime.timeIntervalSince(timestamps[0]) > sensitivity.timeWindow {
             positions.removeFirst()
             timestamps.removeFirst()
         }
@@ -111,8 +111,8 @@ final class GlobalInputCoordinator {
         if ShakeDetector.detect(
             positions: positions,
             timestamps: timestamps,
-            threshold: shakeThreshold,
-            minVelocity: minVelocity
+            threshold: sensitivity.threshold,
+            minVelocity: sensitivity.minVelocity
         ) {
             onShake(currentPos, sessionId)
         }
