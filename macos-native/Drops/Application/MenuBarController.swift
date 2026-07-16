@@ -40,10 +40,8 @@ final class MenuBarController {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.isVisible = true
         if let button = item.button {
-            let image = NSImage(
-                systemSymbolName: "tray.and.arrow.down.fill",
-                accessibilityDescription: L10n.a11yStatusItem
-            )
+            let image = NSImage(named: "MenuBarIcon")
+                ?? NSImage(systemSymbolName: "tray.and.arrow.down.fill", accessibilityDescription: nil)
             image?.isTemplate = true
             button.image = image
             button.toolTip = L10n.a11yStatusItem
@@ -66,7 +64,7 @@ final class MenuBarController {
     }
 
     func rebuildMenu() {
-        let menu = NSMenu(title: "Drops")
+        let menu = NSMenu(title: L10n.appName)
         menu.addItem(makeItem(L10n.newShelf, #selector(newShelf), "n"))
         menu.addItem(makeItem(L10n.settings, #selector(openSettings), ","))
         menu.addItem(makeItem(L10n.about, #selector(openAbout), ""))

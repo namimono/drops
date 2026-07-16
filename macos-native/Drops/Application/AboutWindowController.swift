@@ -50,11 +50,11 @@ private struct AboutRootView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "tray.and.arrow.down.fill")
-                .font(.system(size: 40))
-                .foregroundColor(.secondary)
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .frame(width: 64, height: 64)
                 .accessibilityHidden(true)
-            Text("Drops")
+            Text(L10n.appName)
                 .font(.title2.weight(.semibold))
             Text(L10n.aboutVersion(version, build))
                 .foregroundColor(.secondary)

@@ -92,13 +92,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops shelf"
+            "value" : "Shelf"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops 内容架"
+            "value" : "内容架"
           }
         }
       }
@@ -109,13 +109,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops"
+            "value" : "Shelf"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops"
+            "value" : "内容架"
           }
         }
       }
@@ -160,13 +160,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "About Drops"
+            "value" : "About Shelf"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "关于 Drops"
+            "value" : "关于内容架"
           }
         }
       }
@@ -599,8 +599,22 @@
     "Copyright © 2026 click.shakepin" : {
 
     },
-    "Drops" : {
-
+    "app.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shelf"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容架"
+          }
+        }
+      }
     },
     "menu.about" : {
       "extractionState" : "manual",
@@ -608,13 +622,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "About Drops"
+            "value" : "About Shelf"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "关于 Drops"
+            "value" : "关于内容架"
           }
         }
       }
@@ -727,13 +741,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quit Drops"
+            "value" : "Quit Shelf"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "退出 Drops"
+            "value" : "退出内容架"
           }
         }
       }
@@ -897,13 +911,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Language applies immediately to Drops windows and menus. Some system dialogs may follow the app language after relaunch."
+            "value" : "Language applies immediately to Shelf windows and menus. Some system dialogs may follow the app language after relaunch."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "语言会立即应用于 Drops 窗口与菜单。部分系统对话框可能需重新启动后才跟随应用语言。"
+            "value" : "语言会立即应用于内容架窗口与菜单。部分系统对话框可能需重新启动后才跟随应用语言。"
           }
         }
       }
@@ -1016,13 +1030,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops stores temporary pasteboard content as ordinary files in Application Support. It does not encrypt content at rest or provide a password vault."
+            "value" : "Shelf stores temporary pasteboard content as ordinary files in Application Support. It does not encrypt content at rest or provide a password vault."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops 将剪贴板临时内容以普通文件形式保存在 Application Support 中。应用不会对静态内容加密，也不提供密码保险库。"
+            "value" : "内容架将剪贴板临时内容以普通文件形式保存在 Application Support 中。应用不会对静态内容加密，也不提供密码保险库。"
           }
         }
       }
@@ -1322,13 +1336,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops · %@"
+            "value" : "Shelf · %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drops · %@"
+            "value" : "内容架 · %@"
           }
         }
       }

@@ -32,7 +32,8 @@ final class ApplicationController {
     }
 
     func start() {
-        NSApp.setActivationPolicy(.regular)
+        // Menu-bar utility: no Dock tile (LSUIElement + accessory).
+        NSApp.setActivationPolicy(.accessory)
         AppLocalization.applyStoredOverride(shelfManager.settingsStore.languageOverride)
         shelfManager.onUserFacingError = { [weak self] title, message in
             self?.presentUserMessage(title, message, .warning)

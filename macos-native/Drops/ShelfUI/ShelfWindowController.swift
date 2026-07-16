@@ -130,6 +130,13 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         )
         super.init(window: panel)
 
+        #if DEBUG
+        if NSClassFromString("XCTestCase") != nil {
+            animatesSummon = false
+            animatesPresentationChanges = false
+        }
+        #endif
+
         configurePanel()
         configureContent()
         panel.delegate = self
@@ -159,7 +166,7 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
         contentController.onClaimKeyFocus = { [weak self] in self?.claimKeyFocus() }
     }
 
-    /// Activate Drops and make this shelf key so keyboard / Quick Look stay in-process.
+    /// Activate the app and make this shelf key so keyboard / Quick Look stay in-process.
     func claimKeyFocus() {
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKey()
@@ -176,12 +183,39 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func show(onMilestone: ((ShelfShowMilestone) -> Void)? = nil) {
+        let shouldAnimate = animatesSummon
+            && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+
+        let finalFrame = panel.frame
+        if shouldAnimate {
+            panel.alphaValue = 0
+            let insetX = finalFrame.width * 0.04
+            let insetY = finalFrame.height * 0.04
+            panel.setFrame(finalFrame.insetBy(dx: insetX, dy: insetY), display: false)
+        } else {
+            panel.alphaValue = 1
+        }
+
         panel.orderFrontRegardless()
         if openSource != .shake {
             panel.makeKey()
             NSApp.activate(ignoringOtherApps: true)
         }
+
+        // Milestones fire when the window is ordered front (drop-ready), not after the visual settle.
         notifyWhenReady(onMilestone)
+
+        if shouldAnimate {
+            NSAnimationContext.runAnimationGroup { context in
+                // Match macOS utility / popover timing: short ease-out settle.
+                context.duration = 0.22
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().alphaValue = 1
+                panel.animator().setFrame(finalFrame, display: true)
+            } completionHandler: { [weak self] in
+                self?.refreshRoundedWindowChrome()
+            }
+        }
     }
 
     override func close() {
@@ -200,6 +234,9 @@ final class ShelfWindowController: NSWindowController, NSWindowDelegate {
 
     /// When `false`, size changes skip `NSWindow` animation (useful for rapid automated toggles).
     var animatesPresentationChanges = true
+
+    /// When `false`, the initial summon animation is skipped (tests).
+    var animatesSummon = true
 
     func apply(shelf: Shelf, displayMode: ShelfDisplayMode = .grid) {
         let size = Self.size(

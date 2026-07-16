@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F60718293A4B5C /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D4E5F60718293A4B5C6D7E8F /* InfoPlist.strings */; };
 		0C9F2E7AA18CF95B34EC825C /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA209260D7E2503AFEE8710D /* AppLocalization.swift */; };
 		102DE263D8A035F403A25257 /* ShelfLifecycleStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA8447ABD571D3F3DCA17B9 /* ShelfLifecycleStore.swift */; };
 		155ECB31283C501B27165779 /* ShakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2EC9884DF36CE339D4A201 /* ShakeDetector.swift */; };
@@ -114,6 +115,8 @@
 		EC9AAC63DC924850759172D5 /* ShelfLifecycleStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfLifecycleStoreTests.swift; sourceTree = "<group>"; };
 		F7898C12A97EB961E425BA92 /* Drops.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Drops.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FCD34C4E27850EE80A273C0D /* Stage0PerformanceMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stage0PerformanceMetrics.swift; sourceTree = "<group>"; };
+		B2C3D4E5F60718293A4B5C6D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		C3D4E5F60718293A4B5C6D7E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -121,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				CA80C5ADFA78672AA6CCF04F /* Assets.xcassets */,
+				D4E5F60718293A4B5C6D7E8F /* InfoPlist.strings */,
 				25C5D569503AA334DFAA4E75 /* Localizable.xcstrings */,
 			);
 			path = Resources;
@@ -322,12 +326,25 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXVariantGroup section */
+		D4E5F60718293A4B5C6D7E8F /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B2C3D4E5F60718293A4B5C6D /* en */,
+				C3D4E5F60718293A4B5C6D7E /* zh-Hans */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin PBXResourcesBuildPhase section */
 		8AFFAC1EEDA7F0EA8BD9EA22 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				5F48231B71DD45A479BC962C /* Assets.xcassets in Resources */,
+				A1B2C3D4E5F60718293A4B5C /* InfoPlist.strings in Resources */,
 				F45ED7DC924469F9B5AEFA20 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

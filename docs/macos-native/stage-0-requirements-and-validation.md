@@ -129,9 +129,9 @@
 | D-08 | 拖放 | `NSDraggingDestination` / `NSDraggingSource` + file URL pasteboard | 阶段 0 足够验证 Finder 与跨应用 copy/move/cancel |
 | D-09 | 临时文件根目录 | `~/Library/Application Support/<bundle-id>/TemporaryContent/` | 不用 `NSTemporaryDirectory`，避免系统提前清理 |
 | D-10 | 删除安全 | 标准化路径 + `resolvingSymlinksInPath`，拒绝根外与符号链接逃逸 | 满足 S0-08；清理与手动清理共用入口 |
-| D-11 | Debug/Release | Xcode 标准 Debug / Release；Hardened Runtime 开启 | Release 用于构建验证；正式 Developer ID 公证留到阶段 4 |
+| D-11 | Debug/Release | Xcode 标准 Debug / Release；Hardened Runtime 开启 | Release 用于构建验证；正式 Developer ID 公证留到阶段 5 |
 | D-12 | 签名策略 | 阶段 0：Automatic + 本地开发签名；无 Team 也可 Debug 构建；正式发布用 Developer ID | 发布签名与公证不阻塞阶段 0 退出 |
-| D-13 | Sandbox | 阶段 0 原型 **关闭 App Sandbox** | 降低拖放验证噪声；阶段 4 发布前再启用并补齐书签/权限 |
+| D-13 | Sandbox | 阶段 0 原型 **关闭 App Sandbox** | 降低拖放验证噪声；阶段 5 发布前再启用并补齐书签/权限 |
 | D-14 | Flutter | 原生 Target **零依赖** Flutter Engine / MethodChannel | 运行时与构建均不链接 Flutter |
 | D-15 | 性能预算 | 主动创建→首帧 P95 < 300 ms；摇动/临时→可拖放 P95 < 200 ms | 结束点为 CATransaction completion 后的 firstFrameVisible / dragReady；M-06 手工报告 p95=78.7ms，通过 |
 
@@ -157,7 +157,7 @@
 | R-05 | 清理误删用户原始文件或符号链接逃逸 | 单元测试覆盖外部路径与 symlink | **通过** | `validateManagedURL` 拒绝逃逸；测试见 `ManagedTemporaryFileStoreTests` |
 | R-06 | 使用系统临时目录导致提前丢失 | 决策写入 Application Support | **通过（方案）** | 见决策 D-09 |
 | R-07 | 最低系统版本过高/过低 | 工程 `MACOSX_DEPLOYMENT_TARGET=13.0` | **接受限制** | 仅支持 macOS 13+；不维护更旧版本 |
-| R-08 | 签名/公证阻塞阶段 0 | Debug/Release 本地构建 | **接受限制** | 发布签名留阶段 4；不构成架构阻断 |
+| R-08 | 签名/公证阻塞阶段 0 | Debug/Release 本地构建 | **接受限制** | 发布签名留阶段 5；不构成架构阻断 |
 | R-09 | App Sandbox 与拖放书签复杂度 | 阶段 0 关闭 Sandbox | **接受限制** | 发布前再启用；不改变领域与窗口方案 |
 | R-10 | 性能不达标 | Stage0 指标采样器 | **通过（手工）** | M-06 报告 p95=78.7ms，低于预算 |
 | R-11 | 重写范围过大 | 分阶段交付 | **通过（流程）** | 阶段 0 只做骨架与验证，不交付日用版本 |

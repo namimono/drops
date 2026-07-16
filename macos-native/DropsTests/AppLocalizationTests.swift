@@ -17,6 +17,7 @@ final class AppLocalizationTests: XCTestCase {
     func testManualChineseOverrideTakesPriority() {
         AppLocalization.languageOverride = .simplifiedChinese
         XCTAssertEqual(AppLocalization.effectiveLanguageCode, "zh-Hans")
+        XCTAssertEqual(L10n.appName, "内容架")
         XCTAssertEqual(L10n.newShelf, "新建内容架")
         XCTAssertEqual(L10n.open, "打开")
         XCTAssertEqual(L10n.mergedTextFileName, "合并文本.txt")
@@ -27,6 +28,7 @@ final class AppLocalizationTests: XCTestCase {
     func testManualEnglishOverride() {
         AppLocalization.languageOverride = .english
         XCTAssertEqual(AppLocalization.effectiveLanguageCode, "en")
+        XCTAssertEqual(L10n.appName, "Shelf")
         XCTAssertEqual(L10n.newShelf, "New Shelf")
         XCTAssertEqual(L10n.remove, "Remove")
         XCTAssertEqual(L10n.mergedTextFileName, "Merged Text.txt")
@@ -40,5 +42,6 @@ final class AppLocalizationTests: XCTestCase {
         XCTAssertEqual(AppLocalization.effectiveLanguageCode, "en")
         XCTAssertFalse(L10n.settingsSecurityBody.isEmpty)
         XCTAssertTrue(L10n.settingsSecurityBody.contains("does not encrypt"))
+        XCTAssertTrue(L10n.settingsSecurityBody.contains("Shelf"))
     }
 }

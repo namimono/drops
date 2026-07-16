@@ -94,6 +94,7 @@ final class ShelfManager {
         #if DEBUG
         if NSClassFromString("XCTestCase") != nil {
             controller.animatesPresentationChanges = false
+            controller.animatesSummon = false
         }
         #endif
         wire(controller)

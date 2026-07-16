@@ -99,6 +99,7 @@ enum AppLocalization {
 
 /// Typed keys for String Catalog entries.
 enum L10n {
+    static var appName: String { AppLocalization.string("app.name") }
     static var newShelf: String { AppLocalization.string("menu.new_shelf") }
     static var settings: String { AppLocalization.string("menu.settings") }
     static var about: String { AppLocalization.string("menu.about") }
