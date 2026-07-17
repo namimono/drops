@@ -85,6 +85,15 @@ final class CollapsedStackView: NSView {
         setAccessibilityHelp(L10n.a11yCollapsedStack)
     }
 
+    /// Allow drag-out from an inactive shelf without a prior focus click (Dropover-style).
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// Keep mouseDown/drag tracking on the stack, not NSImageView children.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        return self
+    }
+
     override func mouseDown(with event: NSEvent) {
         mouseDownEvent = event
     }

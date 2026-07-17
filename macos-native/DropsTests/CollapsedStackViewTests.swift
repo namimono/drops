@@ -25,6 +25,14 @@ final class CollapsedStackViewTests: XCTestCase {
         XCTAssertEqual(scroll?.isHidden, true)
     }
 
+    func testCollapsedStackAcceptsFirstMouseForInactiveDragOut() {
+        let stack = CollapsedStackView(frame: NSRect(x: 0, y: 0, width: 120, height: 120))
+        XCTAssertTrue(
+            stack.acceptsFirstMouse(for: nil),
+            "Inactive shelf must deliver the first click so drag-out does not require a focus click"
+        )
+    }
+
     func testExpandedPresentationHidesStackShowsScroll() {
         let shelf = Shelf(source: .menu, lifecycle: .persistent, presentation: .expanded)
         _ = shelf.insertItems([

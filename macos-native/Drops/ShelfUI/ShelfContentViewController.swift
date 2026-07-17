@@ -1272,6 +1272,9 @@ private final class DropHostingView: NSView {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// Inactive shelves should still receive the first click (select / claim focus).
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func mouseDown(with event: NSEvent) {
         owner?.onClaimKeyFocus?()
         super.mouseDown(with: event)
@@ -1338,6 +1341,8 @@ private final class DropHostingView: NSView {
 private final class KeyHandlingCollectionView: NSCollectionView {
     weak var keyHandler: ShelfContentViewController?
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func mouseDown(with event: NSEvent) {
         keyHandler?.onClaimKeyFocus?()
         super.mouseDown(with: event)
@@ -1364,6 +1369,8 @@ private final class KeyHandlingCollectionView: NSCollectionView {
 /// Forwards Space / Delete / Escape while the list holds first responder.
 private final class KeyHandlingTableView: NSTableView {
     weak var keyHandler: ShelfContentViewController?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
         keyHandler?.onClaimKeyFocus?()
@@ -1492,6 +1499,8 @@ private final class CollapsedStackDragButton: NSButton {
     var onBeginDrag: ((NSEvent) -> Void)?
     private var mouseDownEvent: NSEvent?
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func mouseDown(with event: NSEvent) {
         mouseDownEvent = event
     }
@@ -1517,6 +1526,14 @@ private final class ShelfListCellView: NSTableCellView {
     private let nameLabel = NSTextField(labelWithString: "")
     private var representedItemID: ShelfItemID?
     private var mergeHighlight: MergeTargetHighlight = .none
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// Route hits to the cell so inactive-window first-click can start row drag.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        return self
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -1588,6 +1605,16 @@ private final class ShelfListCellView: NSTableCellView {
     }
 }
 
+/// Item chrome that accepts the first click on an inactive shelf window.
+private final class FirstMouseItemView: NSView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        return self
+    }
+}
+
 private final class ShelfGridItemView: NSCollectionViewItem {
     static let identifier = NSUserInterfaceItemIdentifier("ShelfGridItemView")
 
@@ -1597,7 +1624,7 @@ private final class ShelfGridItemView: NSCollectionViewItem {
     private var mergeHighlight: MergeTargetHighlight = .none
 
     override func loadView() {
-        view = NSView()
+        view = FirstMouseItemView()
         view.wantsLayer = true
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.imageScaling = .scaleProportionallyUpOrDown
