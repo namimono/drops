@@ -119,4 +119,29 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(settings.globalHotkey.keyCode, 8)
         XCTAssertEqual(settings.globalHotkey.carbonModifiers, UInt32(cmdKey | optionKey))
     }
+
+    func testWatchedFoldersPersistNormalizeAndToggle() {
+        let suite = "click.shakepin.macos.tests.settings.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let settings = SettingsStore(defaults: defaults)
+        XCTAssertTrue(settings.fileWatchEnabled)
+        XCTAssertTrue(settings.watchedFolders.isEmpty)
+
+        settings.addWatchedFolder("/Users/me/Downloads")
+        settings.addWatchedFolder("/Users/me/Downloads/") // duplicate after standardize
+        settings.addWatchedFolder("  /Users/me/Desktop  ")
+        XCTAssertEqual(
+            settings.watchedFolders,
+            ["/Users/me/Downloads", "/Users/me/Desktop"]
+        )
+
+        settings.setFileWatchEnabled(false)
+        settings.removeWatchedFolder("/Users/me/Downloads")
+
+        let reloaded = SettingsStore(defaults: defaults)
+        XCTAssertFalse(reloaded.fileWatchEnabled)
+        XCTAssertEqual(reloaded.watchedFolders, ["/Users/me/Desktop"])
+    }
 }

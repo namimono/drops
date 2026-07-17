@@ -241,4 +241,17 @@ final class ShelfManagerContentTests: XCTestCase {
         shelf.applySelectionClick(itemID: ids[4], modifiers: .range, anchorID: ids[2])
         XCTAssertEqual(shelf.selection, Set(ids[2...4]))
     }
+
+    func testCollectWatchedFilesCreatesPersistentShelf() throws {
+        let fileURL = tempRoot.appendingPathComponent("watched-new.txt")
+        try "hello".write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let shelfID = manager.collectWatchedFiles([fileURL])
+        XCTAssertNotNil(shelfID)
+        let shelf = manager.shelf(id: shelfID!)
+        XCTAssertEqual(shelf?.source, .fileWatch)
+        XCTAssertEqual(shelf?.lifecycle, .persistent)
+        XCTAssertEqual(shelf?.items.count, 1)
+        XCTAssertEqual(shelf?.items.first?.displayName, "watched-new.txt")
+    }
 }

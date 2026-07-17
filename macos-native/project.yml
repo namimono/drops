@@ -58,7 +58,7 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSApplicationCategoryType: public.app-category.utilities
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
-        LSUIElement: false
+        LSUIElement: true
         NSPrincipalClass: NSApplication
         NSHumanReadableCopyright: "$(PRODUCT_COPYRIGHT)"
         ITSAppUsesNonExemptEncryption: false

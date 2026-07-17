@@ -146,6 +146,34 @@ final class ShelfManager {
         }
     }
 
+    /// Creates (or reuses) a persistent shelf and inserts the given file drafts.
+    /// Used by folder watching when new files appear in a configured directory.
+    @discardableResult
+    func collectWatchedFiles(_ urls: [URL]) -> ShelfID? {
+        let drafts: [ShelfItemDraft] = urls.compactMap { url in
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+                return nil
+            }
+            return ShelfItemDraft.file(url: url, isDirectory: isDirectory.boolValue)
+        }
+        guard !drafts.isEmpty else { return nil }
+
+        if let shelfId = createShelf(source: .fileWatch, nearMouse: true) {
+            _ = acceptContent(shelfId: shelfId, drafts: drafts)
+            return shelfId
+        }
+
+        // At capacity: append to the newest active persistent shelf and bring it forward.
+        let fallback = store.allShelves()
+            .filter { $0.isActive && $0.lifecycle == .persistent }
+            .max(by: { $0.createdAt < $1.createdAt })
+        guard let shelf = fallback else { return nil }
+        _ = acceptContent(shelfId: shelf.id, drafts: drafts)
+        windows[shelf.id]?.show()
+        return shelf.id
+    }
+
     /// Inserts materialized drafts; promotes transient shelves when content arrives.
     /// Commits managed-file references only after a successful insert.
     @discardableResult

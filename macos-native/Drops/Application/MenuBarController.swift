@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-final class MenuBarController {
+final class MenuBarController: NSObject {
     private var statusItem: NSStatusItem?
     private var languageObserver: NSObjectProtocol?
     private var shortcutBindings: MenuShortcutBindings
@@ -37,40 +37,81 @@ final class MenuBarController {
         self.onCloseAll = onCloseAll
         self.onCleanupTemporary = onCleanupTemporary
         self.onLogMetrics = onLogMetrics
+        super.init()
+    }
+
+    deinit {
+        if let languageObserver {
+            NotificationCenter.default.removeObserver(languageObserver)
+        }
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
     }
 
     func start() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.isVisible = true
-        if let button = item.button {
-            let image = NSImage(named: "MenuBarIcon")
-                ?? NSImage(systemSymbolName: "tray.and.arrow.down.fill", accessibilityDescription: nil)
-            image?.isTemplate = true
-            button.image = image
-            button.toolTip = L10n.a11yStatusItem
-            button.setAccessibilityLabel(L10n.a11yStatusItem)
-        }
-        statusItem = item
-        rebuildMenu()
-
-        languageObserver = NotificationCenter.default.addObserver(
-            forName: .dropsLanguageDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.rebuildMenu()
-                if let button = self?.statusItem?.button {
-                    button.toolTip = L10n.a11yStatusItem
-                    button.setAccessibilityLabel(L10n.a11yStatusItem)
-                }
-            }
+        // UIElement / accessory launch: create the status item on the next turn so
+        // AppKit has finished applying activation policy (otherwise the item can be dropped).
+        DispatchQueue.main.async { [weak self] in
+            self?.installStatusItemIfNeeded()
         }
     }
 
     func updateShortcutBindings(_ bindings: MenuShortcutBindings) {
         shortcutBindings = bindings
         rebuildMenu()
+    }
+
+    private func installStatusItemIfNeeded() {
+        if statusItem != nil {
+            rebuildMenu()
+            return
+        }
+
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.isVisible = true
+        if let button = item.button {
+            button.image = Self.makeMenuBarImage()
+            button.imagePosition = .imageOnly
+            button.toolTip = L10n.a11yStatusItem
+            button.setAccessibilityLabel(L10n.a11yStatusItem)
+        } else {
+            NSLog("[MenuBar] status item button unavailable")
+        }
+        statusItem = item
+        rebuildMenu()
+        NSLog("[MenuBar] status item installed visible=%@", item.isVisible ? "YES" : "NO")
+    }
+
+    private static func makeMenuBarImage() -> NSImage {
+        if let named = NSImage(named: "MenuBarIcon")?.copy() as? NSImage {
+            named.isTemplate = true
+            if named.size.width < 1 || named.size.height < 1 {
+                named.size = NSSize(width: 18, height: 18)
+            }
+            return named
+        }
+
+        let symbolName = "tray.and.arrow.down.fill"
+        if let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: L10n.a11yStatusItem) {
+            let configured = symbol.withSymbolConfiguration(
+                NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            ) ?? symbol
+            configured.isTemplate = true
+            return configured
+        }
+
+        // Last resort: never leave an empty status item.
+        let fallback = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+            let inset = rect.insetBy(dx: 3, dy: 3)
+            NSColor.black.setStroke()
+            let path = NSBezierPath(roundedRect: inset, xRadius: 2, yRadius: 2)
+            path.lineWidth = 1.5
+            path.stroke()
+            return true
+        }
+        fallback.isTemplate = true
+        return fallback
     }
 
     func rebuildMenu() {
@@ -97,6 +138,11 @@ final class MenuBarController {
         quit.keyEquivalentModifierMask = shortcutBindings.quit.nsModifierFlags
         menu.addItem(quit)
         statusItem?.menu = menu
+
+        if let button = statusItem?.button {
+            button.toolTip = L10n.a11yStatusItem
+            button.setAccessibilityLabel(L10n.a11yStatusItem)
+        }
     }
 
     private func makeShortcutItem(

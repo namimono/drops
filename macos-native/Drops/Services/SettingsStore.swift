@@ -28,6 +28,9 @@ final class SettingsStore {
     static let menuQuitKeyCodeKey = "drops.shortcut.quit.keyCode"
     static let menuQuitModifiersKey = "drops.shortcut.quit.modifiers"
 
+    static let fileWatchEnabledKey = "drops.fileWatchEnabled"
+    static let watchedFoldersKey = "drops.watchedFolders"
+
     /// `system` follows macOS; otherwise an explicit BCP-47 code (`en`, `zh-Hans`).
     enum LanguageOverride: String, Codable, Sendable, Equatable, CaseIterable {
         case system
@@ -108,6 +111,8 @@ final class SettingsStore {
     private(set) var menuOpenSettings: ShortcutChord
     private(set) var menuCloseAll: ShortcutChord
     private(set) var menuQuit: ShortcutChord
+    private(set) var fileWatchEnabled: Bool
+    private(set) var watchedFolders: [String]
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -174,6 +179,9 @@ final class SettingsStore {
             modifierKeys: [Self.menuQuitModifiersKey],
             fallback: ShortcutAction.quit.defaultChord
         )
+
+        fileWatchEnabled = Self.bool(defaults, keys: [Self.fileWatchEnabledKey], fallback: true)
+        watchedFolders = Self.loadWatchedFolders(defaults)
     }
 
     /// Accepts only 1...120. Illegal input leaves the previous valid value unchanged.
@@ -269,7 +277,51 @@ final class SettingsStore {
         )
     }
 
+    func setFileWatchEnabled(_ enabled: Bool) {
+        fileWatchEnabled = enabled
+        defaults.set(enabled, forKey: Self.fileWatchEnabledKey)
+    }
+
+    /// Replaces the watched-folder list. Paths are standardized and de-duplicated.
+    @discardableResult
+    func setWatchedFolders(_ folders: [String]) -> [String] {
+        watchedFolders = Self.normalizeWatchedFolders(folders)
+        defaults.set(watchedFolders, forKey: Self.watchedFoldersKey)
+        return watchedFolders
+    }
+
+    @discardableResult
+    func addWatchedFolder(_ path: String) -> [String] {
+        setWatchedFolders(watchedFolders + [path])
+    }
+
+    @discardableResult
+    func removeWatchedFolder(_ path: String) -> [String] {
+        let standardized = (path as NSString).standardizingPath
+        return setWatchedFolders(watchedFolders.filter { $0 != standardized })
+    }
+
     // MARK: - Private
+
+    private static func loadWatchedFolders(_ defaults: UserDefaults) -> [String] {
+        guard let stored = defaults.array(forKey: Self.watchedFoldersKey) as? [String] else {
+            return []
+        }
+        return normalizeWatchedFolders(stored)
+    }
+
+    private static func normalizeWatchedFolders(_ folders: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for folder in folders {
+            let trimmed = folder.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let standardized = (trimmed as NSString).standardizingPath
+            guard seen.insert(standardized).inserted else { continue }
+            result.append(standardized)
+        }
+        return result
+    }
 
     private func persist(_ chord: ShortcutChord, keyCodeKey: String, modifiersKey: String) {
         defaults.set(Int(chord.keyCode), forKey: keyCodeKey)

@@ -1,6 +1,6 @@
 # Drops macOS 原生化 · 开发进度
 
-> 更新日期：2026-07-16
+> 更新日期：2026-07-16（文件观察落地）
 > 对应方案：[README.md](./README.md)  
 > 产品依据：[Drops-PRD.md](../Drops-PRD.md)  
 > 阶段 0 实施：[stage-0-requirements-and-validation.md](./stage-0-requirements-and-validation.md)  
@@ -27,10 +27,10 @@
 | 阶段 1 | 内容架领域与窗口骨架 | **已完成** | REV-S1 已关闭 |
 | 阶段 2 | 拖放与剪贴板主链路 | **已完成** | REV-S2 已关闭 |
 | 阶段 3 | 原生交互完善 | **已完成** | REV-S3 已关闭；S3-01～S3-14 全部通过（自动化 + 手工验收）；退出条件已满足 |
-| 阶段 4 | 产品打磨 | **进行中** | 首批 P0（图标/命名/唤起动画）已落地；其余见 [stage-4 需求池](./stage-4-product-polish.md) |
+| 阶段 4 | 产品打磨 | **进行中** | 图标/命名/唤起动画/设置页/文件观察已落地；其余见 [stage-4 需求池](./stage-4-product-polish.md) |
 | 阶段 5 | 发布准备 | **未开始** | 依赖阶段 4 封版；见 [stage-5 §9](./stage-5-release-readiness.md#9-发布接入点规划阶段-3-预埋) |
 
-**综合判断：阶段 3 已退出。当前处于阶段 4 产品打磨；图标/命名/唤起动画/设置页优化（灵敏度 + 快捷键）已落地，全量单测 94/94 通过；Dock 隐藏、动画与设置页交互仍建议手工确认。**
+**综合判断：阶段 3 已退出。当前处于阶段 4 产品打磨；文件观察 P0 已代码落地，全量单测 101/101 通过；设置页配置与真实文件夹新增唤起仍建议手工确认。**
 
 ## 2. 已实现能力
 
@@ -54,6 +54,7 @@
 - **应用名**：英文 Shelf / 中文 内容架（Info.plist、InfoPlist.strings、UI 文案）。
 - **唤起动画**：收集框 show 时淡入 + 轻微缩放（0.22s ease-out）；尊重「减少动态效果」。
 - **设置页**：晃动灵敏度低/中/高；全局唤起快捷键开关/录制/重置；菜单快捷键（新建/设置/关闭全部/退出）可配置；冲突拒绝；中英文本地化。
+- **文件观察**：设置页配置观察文件夹与开关；FSEvents 检测新增文件后唤起持久内容架并自动收集；忽略隐藏文件与未完成下载。
 
 ## 3. 已落地的架构改动
 
@@ -62,12 +63,14 @@
 | 本地化 | `Resources/Localizable.xcstrings` + `Services/AppLocalization.swift` | Catalog + 运行时语言解析 / `L10n`；`app.name` |
 | 应用身份 | `Resources/Info.plist` + `en|zh-Hans.lproj/InfoPlist.strings` | Shelf / 内容架显示名；`LSUIElement` |
 | 图标 | `Resources/Assets.xcassets` | AppIcon + MenuBarIcon |
-| 宿主 | `Application/ApplicationController.swift` | `.accessory` 激活策略 |
+| 宿主 | `Application/ApplicationController.swift` | `.accessory` 激活策略；文件观察回调 |
 | 收起堆 | `ShelfUI/CollapsedStackView.swift` | 最多 3 图标重叠堆 |
 | 内容 UI | `ShelfUI/ShelfContentViewController.swift` | 收起堆 / 展开网格列表 / 本地化 / a11y |
 | 窗口 | `ShelfUI/ShelfWindowController.swift` | 唤起淡入缩放动画 |
-| 设置 | `Application/SettingsWindowController.swift` | 交互/快捷键/通用设置 UI + 快捷键录制 |
-| 偏好 | `Services/SettingsStore.swift` | 灵敏度、全局/菜单快捷键持久化与冲突检测 |
+| 设置 | `Application/SettingsWindowController.swift` | 交互/快捷键/文件观察/通用设置 UI |
+| 偏好 | `Services/SettingsStore.swift` | 灵敏度、快捷键、观察文件夹持久化 |
+| 文件观察 | `Services/FolderWatchService.swift` | FSEvents 监视 + debounce + 基线过滤 |
+| 内容架编排 | `Application/ShelfManager.swift` | `collectWatchedFiles` 唤起并收集 |
 | 输入 | `Input/GlobalInputCoordinator.swift` / `GlobalHotkeyManager.swift` | 按灵敏度检测晃动；按配置注册全局热键 |
 | 打磨阶段 | `docs/macos-native/stage-4-product-polish.md` | 产品打磨需求池 |
 | 发布规划 | `docs/macos-native/stage-5-release-readiness.md` §9 | Sandbox / 签名 / 公证接入点 |
@@ -78,12 +81,14 @@
 2. **部分系统对话框**：语言覆盖立即作用于 UI；极少数系统级对话框可能需重启后完全跟随（设置页已提示）。
 3. **Prototype 未编译**：仅作历史参考。
 4. **图标/动画手工观感**：自动化覆盖命名与窗口里程碑；Dock 隐藏与唤起动画质感待日常试用确认。
+5. **`project.yml` 与 Info.plist 需同步**：`xcodegen generate` 会按 `project.yml` 重写 Info.plist；此前 `LSUIElement: false` 导致重新生成后 Dock 图标再次出现（已改回 `true`）。
 
 ## 5. 验证与修复记录
 
 | 类型 / 级别 | 场景或问题 | 状态 | 证据 / 修复 |
 |---|---|---|---|
-| 构建 / 单测 | Debug 测试 94/94 | **通过** | `xcodebuild test -scheme Drops -destination 'platform=macOS'` |
+| 构建 / 单测 | Debug 测试 101/101 | **通过** | `xcodebuild test -scheme Drops -destination 'platform=macOS'` |
+| 阶段 4 P0 | 文件观察 | **代码已实现，待手工确认** | `FolderWatchServiceTests` / `SettingsStoreTests` / `collectWatchedFiles`；设置页增删文件夹与真实目录新增待试用 |
 | 阶段 4 P0 | 设置页灵敏度 + 快捷键配置 | **代码已实现，待手工确认** | `SettingsStoreTests` / `ShakeDetectionTests`；设置 UI 待试用 |
 | 自动化 | en / zh-Hans 应用名 Shelf / 内容架 | **通过** | `AppLocalizationTests` |
 | 自动化 | 收起堆显示 / 展开隐藏 | **通过** | `CollapsedStackViewTests` |
@@ -113,7 +118,7 @@
 - [x] 应用名统一 Shelf / 内容架（p0）— 自动化通过。
 - [x] 收集框唤起动画（p0）— 代码完成，待手工确认动画质感。
 - [x] 设置页面优化（p0）— 灵敏度低/中/高 + 全部快捷键可配置；自动化通过，待手工确认录制与唤起手感。
-- [ ] 文件观察（p0）
+- [x] 文件观察（p0）— 代码完成（设置配置 + FSEvents + 自动收集）；待手工确认真实文件夹场景。
 - [ ] 直接行动能力建设（p0）
 - [ ] 下拉菜单删除调试选项（p2）
 - [ ] 需求收敛后封版，再进入阶段 5。
@@ -132,17 +137,36 @@
 | 阶段 4：应用名 Shelf / 内容架 | **已实现**（自动化断言） |
 | 阶段 4：唤起动画 | **代码已实现，待手工确认** |
 | 阶段 4：设置页灵敏度 / 快捷键 | **代码已实现，待手工确认** |
+| 阶段 4：文件观察 | **代码已实现，待手工确认** |
 | 阶段 4 其余需求池 | **进行中** |
 
 ## 8. 建议下一迭代顺序
 
-1. 手工确认：设置页灵敏度档位手感、快捷键录制/冲突/全局唤起；Dock 无图标与唤起动画。
-2. 继续 [stage-4-product-polish.md](./stage-4-product-polish.md) 剩余 P0（文件观察、直接行动）。
+1. 手工确认：文件观察（添加文件夹 → 复制新文件 → 收集框唤起并收入）；设置页灵敏度/快捷键；Dock 与唤起动画。
+2. 继续 [stage-4-product-polish.md](./stage-4-product-polish.md) 剩余 P0（直接行动）。
 3. 需求收敛、产品封版后进入 [stage-5-release-readiness.md](./stage-5-release-readiness.md)。
 
 ## 9. 变更文件速查
 
-**本轮（阶段 4 P0：设置页灵敏度 + 快捷键）**
+**本轮（阶段 4 P0：文件观察）**
+
+- `macos-native/Drops/Services/FolderWatchService.swift`（新增）
+- `macos-native/Drops/Services/SettingsStore.swift`
+- `macos-native/Drops/Application/SettingsWindowController.swift`
+- `macos-native/Drops/Application/ApplicationController.swift`
+- `macos-native/Drops/Application/ShelfManager.swift`
+- `macos-native/Drops/Domain/ShelfModels.swift`
+- `macos-native/Drops/Services/AppLocalization.swift`
+- `macos-native/Drops/Resources/Localizable.xcstrings`
+- `macos-native/DropsTests/FolderWatchServiceTests.swift`（新增）
+- `macos-native/DropsTests/SettingsStoreTests.swift`
+- `macos-native/DropsTests/ShelfManagerContentTests.swift`
+- `macos-native/DropsTests/AppLocalizationTests.swift`
+- `macos-native/Drops.xcodeproj/project.pbxproj`
+- `docs/macos-native/stage-4-product-polish.md`
+- `docs/macos-native/development-progress.md`
+
+**上轮（阶段 4 P0：设置页灵敏度 + 快捷键）**
 
 - `macos-native/Drops/Services/SettingsStore.swift`
 - `macos-native/Drops/Application/SettingsWindowController.swift`

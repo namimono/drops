@@ -168,6 +168,13 @@ enum L10n {
     static var settingsHotkeyConflict: String { AppLocalization.string("settings.hotkey_conflict") }
     static var settingsResetShortcut: String { AppLocalization.string("settings.reset_shortcut") }
     static var settingsResetAllShortcuts: String { AppLocalization.string("settings.reset_all_shortcuts") }
+    static var settingsFileWatch: String { AppLocalization.string("settings.file_watch") }
+    static var settingsFileWatchEnabled: String { AppLocalization.string("settings.file_watch_enabled") }
+    static var settingsFileWatchHint: String { AppLocalization.string("settings.file_watch_hint") }
+    static var settingsFileWatchEmpty: String { AppLocalization.string("settings.file_watch_empty") }
+    static var settingsFileWatchAdd: String { AppLocalization.string("settings.file_watch_add") }
+    static var settingsFileWatchAddMessage: String { AppLocalization.string("settings.file_watch_add_message") }
+    static var settingsFileWatchRemove: String { AppLocalization.string("settings.file_watch_remove") }
 
     static var aboutWindowTitle: String { AppLocalization.string("about.window_title") }
     static var aboutBlurb: String { AppLocalization.string("about.blurb") }

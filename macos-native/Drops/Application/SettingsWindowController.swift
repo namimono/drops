@@ -12,6 +12,7 @@ final class SettingsWindowController: NSWindowController {
     private let onHotkeyChanged: () -> Void
     private let onMenuShortcutsChanged: () -> Void
     private let onCleanupRequested: () -> Void
+    private let onFileWatchChanged: () -> Void
 
     init(
         settings: SettingsStore,
@@ -21,7 +22,8 @@ final class SettingsWindowController: NSWindowController {
         onShakeSensitivityChanged: @escaping (SettingsStore.ShakeSensitivity) -> Void,
         onHotkeyChanged: @escaping () -> Void,
         onMenuShortcutsChanged: @escaping () -> Void,
-        onCleanupRequested: @escaping () -> Void
+        onCleanupRequested: @escaping () -> Void,
+        onFileWatchChanged: @escaping () -> Void
     ) {
         self.settings = settings
         self.onRetentionChanged = onRetentionChanged
@@ -31,9 +33,10 @@ final class SettingsWindowController: NSWindowController {
         self.onHotkeyChanged = onHotkeyChanged
         self.onMenuShortcutsChanged = onMenuShortcutsChanged
         self.onCleanupRequested = onCleanupRequested
+        self.onFileWatchChanged = onFileWatchChanged
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 560),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 640),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -84,6 +87,8 @@ final class SettingsWindowController: NSWindowController {
                     ($0, settings.chordFor($0))
                 }
             ),
+            fileWatchEnabled: settings.fileWatchEnabled,
+            watchedFolders: settings.watchedFolders,
             onSaveRetention: { [onRetentionChanged] days in
                 _ = try onRetentionChanged(days)
             },
@@ -121,7 +126,31 @@ final class SettingsWindowController: NSWindowController {
                 onHotkeyChanged()
                 onMenuShortcutsChanged()
             },
-            onCleanup: onCleanupRequested
+            onCleanup: onCleanupRequested,
+            onFileWatchEnabledChange: { [settings, onFileWatchChanged] enabled in
+                settings.setFileWatchEnabled(enabled)
+                onFileWatchChanged()
+            },
+            onAddWatchedFolder: { [settings, onFileWatchChanged] in
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.allowsMultipleSelection = true
+                panel.canCreateDirectories = false
+                panel.prompt = L10n.settingsFileWatchAdd
+                panel.message = L10n.settingsFileWatchAddMessage
+                guard panel.runModal() == .OK else { return settings.watchedFolders }
+                for url in panel.urls {
+                    settings.addWatchedFolder(url.path)
+                }
+                onFileWatchChanged()
+                return settings.watchedFolders
+            },
+            onRemoveWatchedFolder: { [settings, onFileWatchChanged] path in
+                settings.removeWatchedFolder(path)
+                onFileWatchChanged()
+                return settings.watchedFolders
+            }
         )
     }
 }
@@ -133,6 +162,8 @@ private struct SettingsRootView: View {
     @State var shakeSensitivity: SettingsStore.ShakeSensitivity
     @State var globalHotkeyEnabled: Bool
     @State var shortcutChords: [SettingsStore.ShortcutAction: ShortcutChord]
+    @State var fileWatchEnabled: Bool
+    @State var watchedFolders: [String]
     @State var retentionError: String?
     @State var shortcutError: String?
     @State var recordingAction: SettingsStore.ShortcutAction?
@@ -146,6 +177,9 @@ private struct SettingsRootView: View {
     let onResetShortcut: (SettingsStore.ShortcutAction) -> Void
     let onResetAllShortcuts: () -> Void
     let onCleanup: () -> Void
+    let onFileWatchEnabledChange: (Bool) -> Void
+    let onAddWatchedFolder: () -> [String]
+    let onRemoveWatchedFolder: (String) -> [String]
 
     var body: some View {
         Form {
@@ -202,6 +236,50 @@ private struct SettingsRootView: View {
                 }
             } header: {
                 Text(L10n.settingsShortcuts)
+            }
+
+            Section {
+                Toggle(L10n.settingsFileWatchEnabled, isOn: $fileWatchEnabled)
+                    .onChange(of: fileWatchEnabled) { newValue in
+                        onFileWatchEnabledChange(newValue)
+                    }
+
+                Text(L10n.settingsFileWatchHint)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if watchedFolders.isEmpty {
+                    Text(L10n.settingsFileWatchEmpty)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(watchedFolders, id: \.self) { path in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "folder")
+                                .foregroundColor(.secondary)
+                            Text(path)
+                                .font(.system(size: 12))
+                                .lineLimit(2)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 8)
+                            Button(L10n.settingsFileWatchRemove) {
+                                watchedFolders = onRemoveWatchedFolder(path)
+                            }
+                            .disabled(!fileWatchEnabled)
+                        }
+                    }
+                }
+
+                HStack {
+                    Spacer()
+                    Button(L10n.settingsFileWatchAdd) {
+                        watchedFolders = onAddWatchedFolder()
+                    }
+                    .disabled(!fileWatchEnabled)
+                }
+            } header: {
+                Text(L10n.settingsFileWatch)
             }
 
             Section {
@@ -270,7 +348,7 @@ private struct SettingsRootView: View {
         }
         .formStyle(.grouped)
         .padding(8)
-        .frame(minWidth: 460, minHeight: 520)
+        .frame(minWidth: 460, minHeight: 580)
     }
 
     @ViewBuilder

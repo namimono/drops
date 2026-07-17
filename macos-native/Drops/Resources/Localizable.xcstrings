@@ -837,6 +837,125 @@
         }
       }
     },
+    "settings.file_watch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File Watch"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件观察"
+          }
+        }
+      }
+    },
+    "settings.file_watch_add" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Folder…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加文件夹…"
+          }
+        }
+      }
+    },
+    "settings.file_watch_add_message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose folders to watch. New files appearing in these folders will open a shelf and be collected automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择要观察的文件夹。这些文件夹中有新文件出现时，会自动唤起收集框并收入其中。"
+          }
+        }
+      }
+    },
+    "settings.file_watch_empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No folders yet. Add a folder to start watching for new files."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未添加文件夹。添加后即可观察其中的新增文件。"
+          }
+        }
+      }
+    },
+    "settings.file_watch_enabled" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watch folders for new files"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "观察文件夹中的新增文件"
+          }
+        }
+      }
+    },
+    "settings.file_watch_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only new items directly inside a watched folder are collected (not subfolders). Hidden files, incomplete downloads, and common sync sidecars are ignored. Prefer a dedicated folder over Downloads / Movies — those directories get frequent background writes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅收集观察文件夹直接子项（不含深层子目录）。隐藏文件、未完成下载与常见同步临时文件会被忽略。建议观察专用文件夹，而不是「下载 / 影片」等系统目录——那些目录后台写入很频繁，容易误唤起收集框。"
+          }
+        }
+      }
+    },
+    "settings.file_watch_remove" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
+    },
     "settings.general" : {
       "extractionState" : "manual",
       "localizations" : {

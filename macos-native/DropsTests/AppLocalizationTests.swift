@@ -23,6 +23,8 @@ final class AppLocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.mergedTextFileName, "合并文本.txt")
         XCTAssertEqual(L10n.mergeHoverArmed, "正在合并文本，松手完成")
         XCTAssertEqual(L10n.mergeHoverPending, "停留以合并文本")
+        XCTAssertEqual(L10n.settingsFileWatch, "文件观察")
+        XCTAssertEqual(L10n.settingsFileWatchAdd, "添加文件夹…")
     }
 
     func testManualEnglishOverride() {
@@ -33,6 +35,8 @@ final class AppLocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.remove, "Remove")
         XCTAssertEqual(L10n.mergedTextFileName, "Merged Text.txt")
         XCTAssertEqual(L10n.mergeHoverArmed, "Merging text — release to finish")
+        XCTAssertEqual(L10n.settingsFileWatch, "File Watch")
+        XCTAssertEqual(L10n.settingsFileWatchEnabled, "Watch folders for new files")
     }
 
     func testUnsupportedSystemLanguageFallsBackToEnglish() {

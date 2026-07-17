@@ -6,6 +6,7 @@ final class ApplicationController {
     private let shelfManager = ShelfManager()
     private let hotkeyManager = GlobalHotkeyManager()
     private var inputCoordinator: GlobalInputCoordinator?
+    private let folderWatch = FolderWatchService()
     private let metrics = Stage0PerformanceMetrics.shared
     private var menuBar: MenuBarController?
     private var settingsWindow: SettingsWindowController?
@@ -33,7 +34,11 @@ final class ApplicationController {
 
     func start() {
         // Menu-bar utility: no Dock tile (LSUIElement + accessory).
-        NSApp.setActivationPolicy(.accessory)
+        // Keep policy before creating the status item; MenuBarController defers install
+        // one run-loop turn so AppKit does not drop the item during policy apply.
+        if NSApp.activationPolicy() != .accessory {
+            _ = NSApp.setActivationPolicy(.accessory)
+        }
         AppLocalization.applyStoredOverride(shelfManager.settingsStore.languageOverride)
         shelfManager.onUserFacingError = { [weak self] title, message in
             self?.presentUserMessage(title, message, .warning)
@@ -43,6 +48,7 @@ final class ApplicationController {
             self?.createPersistentShelf(source: .hotkey)
         }
         configureInputCoordinator()
+        reloadFolderWatch()
         shelfManager.retentionScheduler?.start()
         if shelfManager.isTemporaryStoreUnavailable {
             NSLog("[Stage3] Managed temporary storage unavailable; paste/materialize disabled.")
@@ -56,6 +62,7 @@ final class ApplicationController {
     }
 
     func prepareForTermination() {
+        folderWatch.stop()
         shelfManager.prepareForTermination()
     }
 
@@ -122,6 +129,9 @@ final class ApplicationController {
                 },
                 onCleanupRequested: { [weak self] in
                     self?.cleanupTemporaryFilesNow()
+                },
+                onFileWatchChanged: { [weak self] in
+                    self?.reloadFolderWatch()
                 }
             )
         }
@@ -210,6 +220,25 @@ final class ApplicationController {
         coordinator.shakeSensitivity = shelfManager.settingsStore.shakeSensitivity
         coordinator.start()
         inputCoordinator = coordinator
+    }
+
+    private func reloadFolderWatch() {
+        let settings = shelfManager.settingsStore
+        folderWatch.start(
+            folders: settings.watchedFolders,
+            enabled: settings.fileWatchEnabled
+        ) { [weak self] urls in
+            guard let self else { return }
+            let id = self.shelfManager.collectWatchedFiles(urls)
+            self.logStore?.append(
+                "File watch collected \(urls.count) item(s) shelf=\(id?.rawValue.uuidString ?? "none")"
+            )
+            NSLog(
+                "[FolderWatch] collected %d item(s) into shelf %@",
+                urls.count,
+                id?.rawValue.uuidString ?? "none"
+            )
+        }
     }
 
     private func createShakeShelf(at location: NSPoint, dragSessionId: DragSessionID) {

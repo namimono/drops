@@ -4,6 +4,8 @@ enum ShelfOpenSource: String, Codable, Sendable, Equatable {
     case hotkey
     case menu
     case shake
+    /// Summoned when a watched folder gains a new file.
+    case fileWatch
 }
 
 enum ShelfLifecycle: String, Codable, Sendable, Equatable {
